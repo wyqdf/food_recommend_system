@@ -120,11 +120,11 @@ onMounted(async () => {
 }
 
 .page-heading {
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .title {
-  font-size: 28px;
+  font-size: 26px;
   line-height: 1.2;
   color: var(--text-primary);
 }
@@ -136,12 +136,12 @@ onMounted(async () => {
 }
 
 .menu-card {
-  min-height: 420px;
+  min-height: 400px;
 }
 
 .user-info {
   text-align: center;
-  padding: 24px 0;
+  padding: 20px 0;
   border-bottom: 1px solid var(--border-color);
   margin-bottom: 12px;
 }
@@ -156,7 +156,7 @@ onMounted(async () => {
 }
 
 .profile-card {
-  min-height: 420px;
+  min-height: 400px;
 }
 
 .profile-header {
@@ -167,13 +167,50 @@ onMounted(async () => {
 }
 
 @media (max-width: 768px) {
+  .title {
+    font-size: 23px;
+  }
+
+  .subtitle {
+    font-size: 13px;
+  }
+
   .menu-card {
     min-height: auto;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
   }
 
   .profile-card {
     min-height: auto;
+  }
+
+  .profile-header {
+    flex-wrap: wrap;
+  }
+
+  :deep(.profile-card .el-form-item__label) {
+    width: 100% !important;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+  }
+
+  :deep(.profile-card .el-form-item__content) {
+    margin-left: 0 !important;
+  }
+
+  :deep(.profile-card .el-button) {
+    width: 100%;
+    min-height: 40px;
+  }
+}
+
+@media (max-width: 430px) {
+  .title {
+    font-size: 21px;
+  }
+
+  .user-info {
+    padding: 14px 0;
   }
 }
 </style>

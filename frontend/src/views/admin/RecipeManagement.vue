@@ -683,6 +683,7 @@ const handleSubmit = async () => {
 
     const data = {
       ...formData,
+      categoryIds: [...new Set(formData.categoryIds.filter(id => Number.isInteger(id) && id > 0))],
       ingredients: formData.ingredients.filter(i => i.ingredientId),
       steps: formData.steps.filter(s => s.description.trim())
     }

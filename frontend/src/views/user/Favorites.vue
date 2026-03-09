@@ -61,6 +61,10 @@ onMounted(() => {
   border-radius: var(--radius-md);
 }
 
+.favorites-card :deep(.el-card__body) {
+  padding: 20px;
+}
+
 .card-header {
   display: flex;
   align-items: center;
@@ -69,7 +73,7 @@ onMounted(() => {
 }
 
 .title {
-  font-size: 18px;
+  font-size: 20px;
   line-height: 1.2;
   color: var(--text-primary);
 }
@@ -83,13 +87,35 @@ onMounted(() => {
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
+  margin-top: 18px;
 }
 
 @media (max-width: 768px) {
+  .favorites-card :deep(.el-card__header) {
+    padding: 14px;
+  }
+
+  .favorites-card :deep(.el-card__body) {
+    padding: 14px;
+  }
+
   .card-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .pagination-wrapper {
+    margin-top: 14px;
+  }
+}
+
+@media (max-width: 430px) {
+  .title {
+    font-size: 18px;
+  }
+
+  .subtitle {
+    font-size: 12px;
   }
 }
 </style>

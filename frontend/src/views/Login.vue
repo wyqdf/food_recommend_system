@@ -138,17 +138,17 @@ onMounted(() => {
 
 <style scoped>
 .login-page {
-  min-height: calc(100vh - 70px);
+  min-height: calc(100vh - 66px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 30px 16px;
   background: radial-gradient(circle at 10% 10%, #fff4eb 0%, #f6f8fb 45%);
 }
 
 .login-container {
   display: flex;
-  max-width: 900px;
+  max-width: 960px;
   width: 100%;
   background: #fff;
   border-radius: var(--radius-lg);
@@ -160,7 +160,7 @@ onMounted(() => {
 .login-left {
   flex: 1;
   background: linear-gradient(135deg, #e85d2a 0%, #f08b5d 70%, #ffb347 100%);
-  padding: 60px 40px;
+  padding: 52px 34px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -169,22 +169,22 @@ onMounted(() => {
 
 .login-brand {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
 .brand-icon {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 24px;
+  margin: 0 auto 18px;
 }
 
 .login-brand h1 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   margin-bottom: 12px;
 }
@@ -197,14 +197,14 @@ onMounted(() => {
 .login-features {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .feature-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 14px 18px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
   transition: var(--transition);
@@ -221,7 +221,7 @@ onMounted(() => {
 
 .login-right {
   flex: 1;
-  padding: 60px 40px;
+  padding: 46px 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -236,11 +236,11 @@ onMounted(() => {
 
 .card-header {
   text-align: center;
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .card-header h2 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
@@ -253,7 +253,7 @@ onMounted(() => {
 
 .login-btn {
   width: 100%;
-  height: 48px;
+  height: 46px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 12px;
@@ -278,16 +278,34 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .login-page {
+    padding: 16px 10px;
+  }
+
   .login-container {
     flex-direction: column;
   }
 
   .login-left {
-    padding: 40px 24px;
+    padding: 24px 18px;
   }
 
   .login-right {
-    padding: 40px 24px;
+    padding: 20px 18px 24px;
+  }
+
+  .login-brand {
+    margin-bottom: 20px;
+  }
+
+  .brand-icon {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 14px;
+  }
+
+  .login-brand h1 {
+    font-size: 24px;
   }
 
   .login-features {
@@ -299,6 +317,44 @@ onMounted(() => {
 
   .feature-item {
     padding: 12px 16px;
+    min-width: 130px;
+  }
+}
+
+@media (max-width: 430px) {
+  .login-left {
+    padding: 24px 14px 20px;
+  }
+
+  .login-right {
+    padding: 14px 12px 20px;
+  }
+
+  .card-header {
+    margin-bottom: 20px;
+  }
+
+  .card-header h2 {
+    font-size: 24px;
+  }
+
+  .form-options {
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 14px;
+  }
+
+  .feature-item {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .login-features {
+    display: none;
+  }
+
+  .login-brand {
+    margin-bottom: 0;
   }
 }
 </style>

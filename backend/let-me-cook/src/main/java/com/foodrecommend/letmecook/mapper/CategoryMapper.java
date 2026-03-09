@@ -16,6 +16,11 @@ public interface CategoryMapper {
                         "WHERE rc.recipe_id = #{recipeId}")
         List<String> findByRecipeId(Integer recipeId);
 
+        @Select("SELECT c.id, c.name FROM categories c " +
+                        "INNER JOIN recipe_categories rc ON c.id = rc.category_id " +
+                        "WHERE rc.recipe_id = #{recipeId} ORDER BY c.id")
+        List<Category> findCategoryInfosByRecipeId(Integer recipeId);
+
         @Select("<script>SELECT rc.recipe_id, c.name FROM categories c " +
                         "INNER JOIN recipe_categories rc ON c.id = rc.category_id " +
                         "WHERE rc.recipe_id IN " +

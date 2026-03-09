@@ -23,7 +23,7 @@ defineProps({
 
 <style scoped>
 .recipe-grid {
-  min-height: 200px;
+  min-height: 180px;
 }
 
 .loading-container {
@@ -39,19 +39,20 @@ defineProps({
 
 .grid-container {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 20px;
 }
 
 @media (max-width: 1280px) {
   .grid-container {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
   }
 }
 
 @media (max-width: 1024px) {
   .grid-container {
-    gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+    gap: 14px;
   }
 }
 
@@ -62,7 +63,14 @@ defineProps({
   }
 }
 
-@media (max-width: 520px) {
+@media (max-width: 430px) {
+  .grid-container {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+}
+
+@media (max-width: 360px) {
   .grid-container {
     grid-template-columns: 1fr;
   }

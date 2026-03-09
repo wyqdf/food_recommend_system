@@ -132,17 +132,17 @@ const handleRegister = async () => {
 
 <style scoped>
 .register-page {
-  min-height: calc(100vh - 70px);
+  min-height: calc(100vh - 66px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px 20px;
+  padding: 30px 16px;
   background: radial-gradient(circle at 90% 10%, #edfbf8 0%, #f6f8fb 45%);
 }
 
 .register-container {
   display: flex;
-  max-width: 900px;
+  max-width: 960px;
   width: 100%;
   background: #fff;
   border-radius: var(--radius-lg);
@@ -154,7 +154,7 @@ const handleRegister = async () => {
 .register-left {
   flex: 1;
   background: linear-gradient(135deg, #0f9b8e 0%, #28b5a8 70%, #69ddd2 100%);
-  padding: 60px 40px;
+  padding: 52px 34px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -163,22 +163,22 @@ const handleRegister = async () => {
 
 .register-brand {
   text-align: center;
-  margin-bottom: 48px;
+  margin-bottom: 36px;
 }
 
 .brand-icon {
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
   background: rgba(255, 255, 255, 0.2);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 24px;
+  margin: 0 auto 18px;
 }
 
 .register-brand h1 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   margin-bottom: 12px;
 }
@@ -191,14 +191,14 @@ const handleRegister = async () => {
 .register-features {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
 }
 
 .feature-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px 24px;
+  padding: 14px 18px;
   background: rgba(255, 255, 255, 0.1);
   border-radius: var(--radius-md);
   transition: var(--transition);
@@ -215,7 +215,7 @@ const handleRegister = async () => {
 
 .register-right {
   flex: 1;
-  padding: 40px;
+  padding: 44px 32px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -234,7 +234,7 @@ const handleRegister = async () => {
 }
 
 .card-header h2 {
-  font-size: 28px;
+  font-size: 26px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
@@ -247,7 +247,7 @@ const handleRegister = async () => {
 
 .register-btn {
   width: 100%;
-  height: 48px;
+  height: 46px;
   font-size: 16px;
   font-weight: 600;
   border-radius: 12px;
@@ -266,16 +266,34 @@ const handleRegister = async () => {
 }
 
 @media (max-width: 768px) {
+  .register-page {
+    padding: 16px 10px;
+  }
+
   .register-container {
     flex-direction: column;
   }
 
   .register-left {
-    padding: 40px 24px;
+    padding: 24px 18px;
   }
 
   .register-right {
-    padding: 40px 24px;
+    padding: 20px 18px 24px;
+  }
+
+  .register-brand {
+    margin-bottom: 20px;
+  }
+
+  .brand-icon {
+    width: 62px;
+    height: 62px;
+    margin-bottom: 14px;
+  }
+
+  .register-brand h1 {
+    font-size: 24px;
   }
 
   .register-features {
@@ -287,6 +305,34 @@ const handleRegister = async () => {
 
   .feature-item {
     padding: 12px 16px;
+    min-width: 130px;
+  }
+}
+
+@media (max-width: 430px) {
+  .register-left {
+    padding: 24px 14px 20px;
+  }
+
+  .register-right {
+    padding: 14px 12px 20px;
+  }
+
+  .card-header h2 {
+    font-size: 24px;
+  }
+
+  .feature-item {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+
+  .register-features {
+    display: none;
+  }
+
+  .register-brand {
+    margin-bottom: 0;
   }
 }
 </style>

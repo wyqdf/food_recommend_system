@@ -2,9 +2,13 @@ package com.foodrecommend.letmecook.controller;
 
 import com.foodrecommend.letmecook.common.Result;
 import com.foodrecommend.letmecook.dto.admin.AdvancedStatisticsDTO;
-import com.foodrecommend.letmecook.service.AdvancedStatisticsService;
+import com.foodrecommend.letmecook.service.AdvancedStatisticsCache;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CrossOrigin;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/statistics")
@@ -12,15 +16,14 @@ import org.springframework.web.bind.annotation.*;
 @CrossOrigin(origins = "*")
 public class AdvancedStatisticsController {
 
-    private final AdvancedStatisticsService advancedStatisticsService;
+    private final AdvancedStatisticsCache advancedStatisticsCache;
 
     /**
      * 获取高级统计数据
      */
     @GetMapping("/advanced")
     public Result<AdvancedStatisticsDTO> getAdvancedStatistics() {
-        AdvancedStatisticsDTO dto = advancedStatisticsService.getAdvancedStatistics();
-        return Result.success(dto);
+        return Result.success(advancedStatisticsCache.getAdvancedStatistics());
     }
 
     /**
@@ -28,7 +31,7 @@ public class AdvancedStatisticsController {
      */
     @GetMapping("/difficulty-distribution")
     public Result<?> getDifficultyDistribution() {
-        return Result.success(advancedStatisticsService.getDifficultyDistribution());
+        return Result.success(advancedStatisticsCache.getDifficultyDistribution());
     }
 
     /**
@@ -36,7 +39,7 @@ public class AdvancedStatisticsController {
      */
     @GetMapping("/timecost-distribution")
     public Result<?> getTimeCostDistribution() {
-        return Result.success(advancedStatisticsService.getTimeCostDistribution());
+        return Result.success(advancedStatisticsCache.getTimeCostDistribution());
     }
 
     /**
@@ -44,7 +47,7 @@ public class AdvancedStatisticsController {
      */
     @GetMapping("/monthly-trend")
     public Result<?> getMonthlyTrend() {
-        return Result.success(advancedStatisticsService.getMonthlyTrend());
+        return Result.success(advancedStatisticsCache.getMonthlyTrend());
     }
 
     /**
@@ -52,7 +55,6 @@ public class AdvancedStatisticsController {
      */
     @PostMapping("/refresh")
     public Result<String> refreshStatistics() {
-        String result = advancedStatisticsService.refreshAllStatistics();
-        return Result.success(result);
+        return Result.success(advancedStatisticsCache.refreshNow());
     }
 }

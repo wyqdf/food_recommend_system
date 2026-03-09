@@ -24,7 +24,7 @@
       </div>
 
       <el-row :gutter="24">
-        <el-col :span="16">
+        <el-col :xs="24" :lg="16">
           <el-card class="main-card">
             <div class="recipe-image">
               <el-image :src="recipe.image || defaultImage" fit="cover">
@@ -135,7 +135,7 @@
           </el-card>
         </el-col>
 
-        <el-col :span="8">
+        <el-col :xs="24" :lg="8">
           <el-card class="side-card">
             <el-button type="primary" :icon="Star" @click="toggleFavorite" :loading="favoriting">
               {{ isFavorited ? '取消收藏' : '收藏菜谱' }}
@@ -329,11 +329,11 @@ const goRecipe = (id) => {
 }
 
 .recipe-header {
-  margin-bottom: 32px;
+  margin-bottom: 24px;
 }
 
 .recipe-header h1 {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 16px;
@@ -341,9 +341,10 @@ const goRecipe = (id) => {
 
 .recipe-meta {
   display: flex;
-  gap: 24px;
+  gap: 18px;
   color: var(--text-secondary);
   font-size: 14px;
+  flex-wrap: wrap;
 }
 
 .recipe-meta span {
@@ -357,24 +358,24 @@ const goRecipe = (id) => {
 }
 
 .main-card {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   border-radius: var(--radius-md);
 }
 
 .recipe-image {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   border-radius: var(--radius-md);
   overflow: hidden;
 }
 
 .recipe-image .el-image {
   width: 100%;
-  height: 360px;
+  height: 320px;
 }
 
 .image-error-placeholder {
   width: 100%;
-  height: 360px;
+  height: 320px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -387,7 +388,7 @@ const goRecipe = (id) => {
 .recipe-properties {
   display: flex;
   gap: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   flex-wrap: wrap;
 }
 
@@ -397,14 +398,14 @@ const goRecipe = (id) => {
 }
 
 .section {
-  margin-bottom: 32px;
+  margin-bottom: 26px;
 }
 
 .section h3 {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 16px;
+  margin-bottom: 14px;
   padding-bottom: 12px;
   border-bottom: 2px solid var(--primary-color);
   display: inline-block;
@@ -483,9 +484,9 @@ const goRecipe = (id) => {
 
 .step-item {
   display: flex;
-  gap: 20px;
-  margin-bottom: 24px;
-  padding: 20px;
+  gap: 16px;
+  margin-bottom: 18px;
+  padding: 16px;
   background: var(--bg-color);
   border-radius: var(--radius-md);
   transition: var(--transition);
@@ -540,7 +541,7 @@ const goRecipe = (id) => {
 }
 
 .comment-card {
-  margin-bottom: 24px;
+  margin-bottom: 18px;
   border-radius: var(--radius-md);
 }
 
@@ -559,17 +560,18 @@ const goRecipe = (id) => {
   margin-top: 12px;
   border-radius: 20px;
   padding: 10px 24px;
+  min-height: 40px;
 }
 
 .comment-list {
-  max-height: 500px;
+  max-height: 440px;
   overflow-y: auto;
 }
 
 .comment-item {
   display: flex;
   gap: 16px;
-  padding: 20px 0;
+  padding: 16px 0;
   border-bottom: 1px solid var(--border-color);
 }
 
@@ -606,14 +608,28 @@ const goRecipe = (id) => {
 }
 
 .side-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
   border-radius: var(--radius-md);
 }
 
 .side-card :deep(.el-card__header) {
-  padding: 16px 20px;
+  padding: 14px 18px;
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
+}
+
+.side-card :deep(.el-card__body) {
+  padding: 16px 18px;
+}
+
+.side-card .el-button {
+  width: 100%;
+  min-height: 42px;
+}
+
+.side-card .el-button + .el-button {
+  margin-top: 10px;
+  margin-left: 0;
 }
 
 .no-recommend {
@@ -623,7 +639,7 @@ const goRecipe = (id) => {
 .recommend-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .recommend-item {
@@ -675,5 +691,104 @@ const goRecipe = (id) => {
   background: var(--primary-color);
   border-color: var(--primary-color);
   color: #fff;
+}
+
+@media (max-width: 1024px) {
+  .recipe-header {
+    margin-bottom: 20px;
+  }
+
+  .recipe-header h1 {
+    font-size: 28px;
+    margin-bottom: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .recipe-header h1 {
+    font-size: 24px;
+  }
+
+  .recipe-meta {
+    gap: 10px 16px;
+  }
+
+  .recipe-image .el-image,
+  .image-error-placeholder {
+    height: 230px;
+  }
+
+  .main-card,
+  .comment-card,
+  .side-card {
+    margin-bottom: 14px;
+  }
+
+  .section {
+    margin-bottom: 24px;
+  }
+
+  .section h3 {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .ingredient-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .step-item {
+    gap: 12px;
+    margin-bottom: 14px;
+    padding: 12px;
+  }
+
+  .step-number {
+    width: 34px;
+    height: 34px;
+    font-size: 14px;
+  }
+
+  .step-image {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .comment-item {
+    gap: 10px;
+    padding: 14px 0;
+  }
+
+  .comment-header {
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .side-card :deep(.el-card__body) {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 430px) {
+  .recipe-header h1 {
+    font-size: 22px;
+  }
+
+  .recipe-meta {
+    font-size: 13px;
+  }
+
+  .ingredient-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .step-item {
+    flex-direction: column;
+  }
+
+  .comment-form .el-button {
+    width: 100%;
+  }
 }
 </style>

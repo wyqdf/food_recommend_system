@@ -6,6 +6,11 @@
     <el-container class="app-container">
       <el-header class="app-header">
         <div class="header-content">
+          <el-button class="mobile-menu-btn" text circle @click="mobileMenuVisible = true">
+            <el-icon :size="20">
+              <Menu />
+            </el-icon>
+          </el-button>
           <div class="logo" @click="$router.push('/')">
             <div class="logo-icon">
               <el-icon :size="24">
@@ -32,6 +37,12 @@
                 <Star />
               </el-icon>
               推荐
+            </el-menu-item>
+            <el-menu-item index="/create-recipe">
+              <el-icon>
+                <EditPen />
+              </el-icon>
+              发布
             </el-menu-item>
             <el-menu-item index="/admin/login">
               <el-icon>
@@ -84,7 +95,7 @@
                 <el-icon>
                   <User />
                 </el-icon>
-                登录
+                <span class="login-btn-text">登录</span>
               </el-button>
             </template>
           </div>
@@ -115,32 +126,136 @@
         </div>
       </el-footer>
     </el-container>
+
+    <el-drawer v-model="mobileMenuVisible" direction="ltr" size="86%" class="mobile-nav-drawer" :with-header="false">
+      <div class="mobile-drawer-content">
+        <div class="mobile-brand" @click="goTo('/')">
+          <div class="logo-icon">
+            <el-icon :size="22">
+              <Food />
+            </el-icon>
+          </div>
+          <span>美食推荐</span>
+        </div>
+
+        <div class="mobile-search">
+          <el-input v-model="searchKeyword" placeholder="搜索菜谱..." clearable @keyup.enter="handleSearch">
+            <template #prefix>
+              <el-icon>
+                <Search />
+              </el-icon>
+            </template>
+          </el-input>
+          <el-button type="primary" @click="handleSearch">搜索</el-button>
+        </div>
+
+        <el-menu class="mobile-nav-menu" :default-active="activeMobileNav" @select="handleMobileMenuSelect">
+          <el-menu-item index="/">
+            <el-icon>
+              <HomeFilled />
+            </el-icon>
+            首页
+          </el-menu-item>
+          <el-menu-item index="/recipes">
+            <el-icon>
+              <Dish />
+            </el-icon>
+            菜谱
+          </el-menu-item>
+          <el-menu-item index="/recommend">
+            <el-icon>
+              <Star />
+            </el-icon>
+            推荐
+          </el-menu-item>
+          <el-menu-item index="/create-recipe">
+            <el-icon>
+              <EditPen />
+            </el-icon>
+            发布菜谱
+          </el-menu-item>
+          <el-menu-item index="/admin/login">
+            <el-icon>
+              <Setting />
+            </el-icon>
+            管理后台
+          </el-menu-item>
+        </el-menu>
+
+        <div class="mobile-user-panel">
+          <template v-if="userStore.isLoggedIn">
+            <div class="mobile-user-info">
+              <el-avatar :size="34" class="user-avatar">{{ userStore.user?.username?.charAt(0) || 'U' }}</el-avatar>
+              <div class="mobile-user-text">
+                <strong>{{ userStore.user?.username || '用户' }}</strong>
+                <span>欢迎回来</span>
+              </div>
+            </div>
+            <div class="mobile-user-actions">
+              <el-button @click="goTo('/user')">个人中心</el-button>
+              <el-button @click="goTo('/user/favorites')">我的收藏</el-button>
+              <el-button type="danger" plain @click="handleLogout">退出登录</el-button>
+            </div>
+          </template>
+          <template v-else>
+            <div class="mobile-user-actions">
+              <el-button type="primary" @click="goTo('/login')">登录</el-button>
+              <el-button @click="goTo('/register')">注册</el-button>
+            </div>
+          </template>
+        </div>
+      </div>
+    </el-drawer>
   </template>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Food, HomeFilled, Dish, Star, User, CollectionTag, SwitchButton, Setting } from '@element-plus/icons-vue'
+import { Search, Food, HomeFilled, Dish, Star, User, CollectionTag, SwitchButton, Setting, Menu, EditPen } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const searchKeyword = ref('')
+const mobileMenuVisible = ref(false)
 
 const isAdminPage = computed(() => {
   return route.path.startsWith('/admin')
 })
 
+const activeMobileNav = computed(() => {
+  if (route.path.startsWith('/recipes')) return '/recipes'
+  if (route.path.startsWith('/recommend')) return '/recommend'
+  if (route.path.startsWith('/create-recipe')) return '/create-recipe'
+  if (route.path.startsWith('/admin')) return '/admin/login'
+  return '/'
+})
+
+watch(() => route.fullPath, () => {
+  mobileMenuVisible.value = false
+})
+
 const handleSearch = () => {
   if (searchKeyword.value.trim()) {
+    mobileMenuVisible.value = false
     router.push({ path: '/search', query: { keyword: searchKeyword.value } })
   }
 }
 
+const goTo = (path) => {
+  mobileMenuVisible.value = false
+  router.push(path)
+}
+
+const handleMobileMenuSelect = (index) => {
+  goTo(index)
+}
+
 const handleLogout = () => {
   userStore.logout()
+  mobileMenuVisible.value = false
   router.push('/')
 }
 </script>
@@ -155,7 +270,7 @@ const handleLogout = () => {
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--border-color);
   box-shadow: var(--shadow-xs);
-  height: 70px;
+  height: 66px;
   padding: 0;
   position: sticky;
   top: 0;
@@ -168,8 +283,14 @@ const handleLogout = () => {
   height: 100%;
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 14px;
+  padding: 0 22px;
+  gap: 12px;
+}
+
+.mobile-menu-btn {
+  display: none;
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
 }
 
 .logo {
@@ -185,8 +306,8 @@ const handleLogout = () => {
 }
 
 .logo-icon {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
   border-radius: var(--radius-sm);
   display: flex;
@@ -196,7 +317,7 @@ const handleLogout = () => {
 }
 
 .logo-text {
-  font-size: 22px;
+  font-size: 20px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
   -webkit-background-clip: text;
@@ -207,14 +328,14 @@ const handleLogout = () => {
 .nav-menu {
   flex: 1;
   border-bottom: none;
-  margin-left: 36px;
+  margin-left: 24px;
   background: transparent;
 }
 
 .nav-menu .el-menu-item {
-  height: 70px;
-  line-height: 70px;
-  font-size: 15px;
+  height: 66px;
+  line-height: 66px;
+  font-size: 14px;
   font-weight: 500;
   border-bottom: 3px solid transparent;
   transition: var(--transition);
@@ -237,7 +358,7 @@ const handleLogout = () => {
 }
 
 .search-input {
-  width: 230px;
+  width: 210px;
 }
 
 .search-input :deep(.el-input__wrapper) {
@@ -247,7 +368,7 @@ const handleLogout = () => {
 
 .search-btn {
   border-radius: 20px;
-  padding: 8px 20px;
+  padding: 8px 18px;
 }
 
 .user-info {
@@ -283,14 +404,14 @@ const handleLogout = () => {
 
 .app-main {
   background: var(--bg-color);
-  padding: 24px 0;
-  min-height: calc(100vh - 70px - 180px);
+  padding: 20px 0;
+  min-height: calc(100vh - 66px - 168px);
 }
 
 .app-footer {
   background: #17202a;
   height: auto;
-  padding: 40px 0 24px;
+  padding: 32px 0 20px;
   border-top: none;
 }
 
@@ -351,6 +472,90 @@ const handleLogout = () => {
   font-size: 12px;
 }
 
+.mobile-drawer-content {
+  height: 100%;
+  padding: 20px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.mobile-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.mobile-search {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.mobile-search .el-input {
+  flex: 1;
+}
+
+.mobile-search .el-button {
+  min-width: 72px;
+}
+
+.mobile-nav-menu {
+  border-right: none;
+  margin: 6px 0 12px;
+}
+
+.mobile-nav-menu .el-menu-item {
+  border-radius: 10px;
+  margin-bottom: 4px;
+}
+
+.mobile-user-panel {
+  margin-top: auto;
+  padding-top: 14px;
+  padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border-color);
+}
+
+.mobile-user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.mobile-user-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.mobile-user-text strong {
+  color: var(--text-primary);
+  font-size: 14px;
+}
+
+.mobile-user-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.mobile-user-actions .el-button {
+  width: 100%;
+}
+
+:deep(.mobile-nav-drawer .el-drawer__body) {
+  padding: 0;
+}
+
 @media (max-width: 1100px) {
   .nav-menu {
     margin-left: 10px;
@@ -361,14 +566,27 @@ const handleLogout = () => {
   }
 
   .logo-text {
-    font-size: 19px;
+    font-size: 18px;
   }
 }
 
 @media (max-width: 900px) {
+  .mobile-menu-btn {
+    display: inline-flex;
+  }
+
   .header-content {
     gap: 8px;
-    padding: 0 12px;
+    padding: 0 14px;
+  }
+
+  .header-right {
+    margin-left: auto;
+    gap: 8px;
+  }
+
+  .nav-menu {
+    display: none;
   }
 
   .search-wrapper {
@@ -382,6 +600,15 @@ const handleLogout = () => {
   .logo-text {
     display: none;
   }
+
+  .login-btn {
+    padding: 8px 12px;
+    min-height: 38px;
+  }
+
+  .user-info {
+    padding: 4px 8px;
+  }
 }
 
 @media (max-width: 640px) {
@@ -389,18 +616,52 @@ const handleLogout = () => {
     margin-left: 0;
   }
 
+  .logo-icon {
+    width: 34px;
+    height: 34px;
+  }
+
+  .login-btn-text {
+    display: none;
+  }
+
+  .login-btn {
+    min-width: 36px;
+    padding: 8px;
+  }
+
+  .mobile-search {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .mobile-search .el-button {
+    width: 100%;
+  }
+
   .user-name {
     display: none;
   }
 
   .app-footer {
-    padding: 24px 0 16px;
+    padding: 22px 0 14px;
   }
 
   .footer-links {
     gap: 14px;
     flex-wrap: wrap;
     justify-content: center;
+  }
+}
+
+@media (max-width: 430px) {
+  .mobile-drawer-content {
+    padding: 16px 12px;
+  }
+
+  .mobile-nav-menu .el-menu-item {
+    height: 44px;
+    line-height: 44px;
   }
 }
 </style>

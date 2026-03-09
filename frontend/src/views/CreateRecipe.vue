@@ -673,17 +673,17 @@ onMounted(() => {
 .create-recipe-page {
   min-height: 100vh;
   background: radial-gradient(circle at 8% 8%, #fff3ea 0%, #f6f8fb 52%);
-  padding: 40px 20px;
+  padding: 30px 18px;
 }
 
 .page-container {
-  max-width: 900px;
+  max-width: 980px;
   margin: 0 auto;
 }
 
 .page-header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 30px;
 }
 
 .header-content {
@@ -691,7 +691,7 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: 36px;
+  font-size: 34px;
   font-weight: 700;
   margin: 0 0 12px;
   display: flex;
@@ -712,21 +712,21 @@ onMounted(() => {
 
 .form-container {
   background: white;
-  border-radius: 24px;
-  padding: 40px;
+  border-radius: 22px;
+  padding: 32px;
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-lg);
 }
 
 .form-section {
-  margin-bottom: 40px;
-  padding-bottom: 30px;
+  margin-bottom: 32px;
+  padding-bottom: 24px;
   border-bottom: 1px solid #f0f0f0;
 }
 
 .form-section:last-of-type {
   border-bottom: none;
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
 .section-title {
@@ -736,7 +736,7 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 24px;
+  margin-bottom: 18px;
 }
 
 .section-number {
@@ -755,7 +755,7 @@ onMounted(() => {
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 20px;
+  gap: 16px;
 }
 
 .form-item {
@@ -807,14 +807,14 @@ onMounted(() => {
 
 .attributes-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
 }
 
 .attribute-card {
   background: linear-gradient(180deg, #f8fbff 0%, #f6f9ff 100%);
   border-radius: 16px;
-  padding: 20px;
+  padding: 18px;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -887,7 +887,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 16px;
+  padding: 14px;
   background: #f8fbff;
   border-radius: 12px;
   border: 1px solid #e7eef8;
@@ -942,8 +942,8 @@ onMounted(() => {
 
 .step-card {
   display: flex;
-  gap: 20px;
-  padding: 24px;
+  gap: 16px;
+  padding: 18px;
   background: #f8fbff;
   border-radius: 16px;
   border: 1px solid #e7eef8;
@@ -1049,8 +1049,8 @@ onMounted(() => {
 }
 
 .selected-categories {
-  min-height: 60px;
-  padding: 16px;
+  min-height: 54px;
+  padding: 14px;
   background: #f8fbff;
   border-radius: 12px;
   border: 1px solid #e7eef8;
@@ -1081,13 +1081,13 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   gap: 16px;
-  margin-top: 40px;
-  padding-top: 30px;
+  margin-top: 28px;
+  padding-top: 22px;
   border-top: 1px solid #f0f0f0;
 }
 
 .submit-btn {
-  padding: 12px 32px;
+  padding: 12px 28px;
   border-radius: 12px;
   font-size: 16px;
 }
@@ -1132,28 +1132,59 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .create-recipe-page {
-    padding: 20px 10px;
+    padding: 18px 10px;
   }
 
   .page-title {
-    font-size: 28px;
+    font-size: 26px;
+  }
+
+  .page-subtitle {
+    font-size: 14px;
   }
 
   .form-container {
-    padding: 24px;
+    padding: 22px;
     border-radius: 16px;
+  }
+
+  .section-title {
+    margin-bottom: 16px;
+    font-size: 17px;
   }
 
   .form-grid {
     grid-template-columns: 1fr;
   }
 
-  .attributes-grid {
-    grid-template-columns: repeat(2, 1fr);
+  .image-upload-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .image-uploader,
+  .image-uploader .el-button {
+    width: 100%;
+  }
+
+  .image-preview {
+    max-width: 100%;
+  }
+
+  .attribute-card {
+    padding: 14px;
+    gap: 10px;
+  }
+
+  .attribute-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
   }
 
   .ingredient-item {
     flex-wrap: wrap;
+    padding: 12px;
   }
 
   .ingredient-name {
@@ -1163,11 +1194,103 @@ onMounted(() => {
   .ingredient-type,
   .ingredient-quantity {
     flex: 1;
+    width: auto;
+  }
+
+  .remove-btn {
+    margin-left: auto;
+  }
+
+  .step-image-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .step-image-uploader,
+  .step-image-uploader .el-button {
+    width: 100%;
   }
 
   .step-card {
     flex-direction: column;
     gap: 12px;
+    padding: 14px;
+  }
+
+  .step-actions {
+    justify-content: flex-end;
+  }
+
+  .form-actions {
+    margin-top: 20px;
+    padding-top: 16px;
+  }
+}
+
+@media (max-width: 430px) {
+  .create-recipe-page {
+    padding: 16px 8px;
+  }
+
+  .page-title {
+    font-size: 23px;
+    gap: 8px;
+  }
+
+  .title-icon {
+    font-size: 30px;
+  }
+
+  .form-container {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  .form-section {
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+  }
+
+  .attributes-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ingredient-type,
+  .ingredient-quantity {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .add-ingredient-btn,
+  .add-step-btn {
+    width: 100%;
+  }
+
+  .step-number-circle {
+    width: 34px;
+    height: 34px;
+    font-size: 15px;
+  }
+
+  .category-hints {
+    gap: 6px;
+  }
+
+  .hint-text {
+    width: 100%;
+  }
+
+  .selected-categories {
+    padding: 12px;
+  }
+
+  .form-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+
+  .form-actions .el-button,
+  .submit-btn {
+    width: 100%;
   }
 }
 </style>

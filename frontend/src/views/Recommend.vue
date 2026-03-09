@@ -83,29 +83,29 @@ onMounted(() => {
 }
 
 .page-header {
-  margin-bottom: 22px;
-  padding: 22px 24px;
+  margin-bottom: 18px;
+  padding: 20px 22px;
   border-radius: var(--radius-md);
   background: linear-gradient(135deg, #eefaf8 0%, #ffffff 70%);
   border: 1px solid #dceeea;
 }
 
 .page-header h2 {
-  font-size: 32px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
   margin-bottom: 8px;
 }
 
 .page-header p {
-  font-size: 16px;
+  font-size: 15px;
   color: var(--text-secondary);
 }
 
 .tabs-wrapper {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   background: #fff;
-  padding: 8px 24px;
+  padding: 8px 18px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-xs);
@@ -115,7 +115,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 :deep(.el-tabs__nav-wrap::after) {
@@ -123,8 +123,74 @@ onMounted(() => {
 }
 
 :deep(.el-tabs__item) {
-  padding: 0 24px;
-  height: 48px;
-  line-height: 48px;
+  padding: 0 20px;
+  height: 46px;
+  line-height: 46px;
+}
+
+@media (max-width: 768px) {
+  .page-header {
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+
+  .page-header h2 {
+    font-size: 24px;
+  }
+
+  .page-header p {
+    font-size: 14px;
+  }
+
+  .tabs-wrapper {
+    padding: 6px 10px;
+    margin-bottom: 14px;
+  }
+
+  .tab-label {
+    font-size: 13px;
+    gap: 4px;
+  }
+
+  :deep(.el-tabs__item) {
+    padding: 0 12px;
+    height: 42px;
+    line-height: 42px;
+  }
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 2px;
+  }
+}
+
+@media (max-width: 430px) {
+  .page-header h2 {
+    font-size: 22px;
+  }
+
+  .page-header p {
+    line-height: 1.5;
+  }
+
+  .tab-label .el-icon {
+    display: none;
+  }
+
+  :deep(.el-tabs__nav-wrap) {
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  :deep(.el-tabs__nav-wrap::-webkit-scrollbar) {
+    display: none;
+  }
+
+  :deep(.el-tabs__nav) {
+    min-width: max-content;
+  }
+
+  :deep(.el-tabs__item) {
+    padding: 0 12px;
+  }
 }
 </style>

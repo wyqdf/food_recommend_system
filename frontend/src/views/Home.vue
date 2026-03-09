@@ -189,16 +189,16 @@ onMounted(async () => {
 
 <style scoped>
 .home-page {
-    padding-bottom: 60px;
+    padding-bottom: 46px;
 }
 
 .hero-section {
     position: relative;
     text-align: center;
-    padding: 80px 40px;
+    padding: 64px 34px;
     background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 50%, #ffa8a8 100%);
     border-radius: var(--radius-lg);
-    margin-bottom: 48px;
+    margin-bottom: 38px;
     overflow: hidden;
 }
 
@@ -208,10 +208,10 @@ onMounted(async () => {
 }
 
 .hero-title {
-    font-size: 48px;
+    font-size: 42px;
     font-weight: 800;
     color: #fff;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
     line-height: 1.3;
 }
 
@@ -224,17 +224,17 @@ onMounted(async () => {
 }
 
 .hero-subtitle {
-    font-size: 20px;
+    font-size: 18px;
     color: rgba(255, 255, 255, 0.9);
-    margin-bottom: 40px;
+    margin-bottom: 30px;
 }
 
 .hero-search {
     display: flex;
     justify-content: center;
     gap: 12px;
-    max-width: 560px;
-    margin: 0 auto 24px;
+    max-width: 600px;
+    margin: 0 auto 18px;
 }
 
 .hero-search .el-input {
@@ -249,7 +249,7 @@ onMounted(async () => {
 
 .hero-search .el-button {
     border-radius: 28px;
-    padding: 0 32px;
+    padding: 0 28px;
     background: var(--accent-color);
     border-color: var(--accent-color);
     color: var(--text-primary);
@@ -270,7 +270,7 @@ onMounted(async () => {
 }
 
 .hero-actions {
-    margin-top: 20px;
+    margin-top: 18px;
 }
 
 .tag-label {
@@ -343,18 +343,18 @@ onMounted(async () => {
 .category-section,
 .recommend-section,
 .hot-section {
-    margin-bottom: 48px;
+    margin-bottom: 38px;
 }
 
 .section-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
 }
 
 .section-header h2 {
-    font-size: 26px;
+    font-size: 24px;
     font-weight: 700;
     color: var(--text-primary);
     position: relative;
@@ -389,14 +389,14 @@ onMounted(async () => {
 .category-list {
     display: grid;
     grid-template-columns: repeat(8, 1fr);
-    gap: 16px;
+    gap: 14px;
 }
 
 .category-item {
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 24px 16px;
+    padding: 20px 12px;
     background: #fff;
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -423,8 +423,8 @@ onMounted(async () => {
 }
 
 .category-icon {
-    width: 60px;
-    height: 60px;
+    width: 56px;
+    height: 56px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
@@ -445,7 +445,7 @@ onMounted(async () => {
     }
 
     .hero-title {
-        font-size: 36px;
+        font-size: 34px;
     }
 }
 
@@ -455,19 +455,80 @@ onMounted(async () => {
     }
 
     .hero-section {
-        padding: 40px 20px;
+        padding: 30px 14px;
+        margin-bottom: 22px;
     }
 
     .hero-title {
-        font-size: 28px;
+        font-size: 24px;
     }
 
     .hero-search {
         flex-direction: column;
+        margin-bottom: 12px;
+    }
+
+    .hero-search .el-button {
+        width: 100%;
+        padding: 0 20px;
+    }
+
+    .section-header {
+        margin-bottom: 12px;
+    }
+
+    .section-header h2 {
+        font-size: 22px;
+    }
+
+    .view-all {
+        font-size: 13px;
     }
 
     .floating-card {
         display: none;
+    }
+}
+
+@media (max-width: 430px) {
+    .home-page {
+        padding-bottom: 30px;
+    }
+
+    .hero-title {
+        font-size: 22px;
+    }
+
+    .hero-subtitle {
+        font-size: 15px;
+        margin-bottom: 14px;
+    }
+
+    .hero-tags {
+        justify-content: flex-start;
+        gap: 8px;
+    }
+
+    .tag-label {
+        width: 100%;
+    }
+
+    .category-item {
+        padding: 14px 10px;
+    }
+
+    .section-header {
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .section-header h2 {
+        font-size: 20px;
+    }
+
+    .category-icon {
+        width: 44px;
+        height: 44px;
     }
 }
 </style>

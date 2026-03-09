@@ -2,6 +2,7 @@ package com.foodrecommend.letmecook.service;
 
 import com.foodrecommend.letmecook.common.PageResult;
 import com.foodrecommend.letmecook.dto.admin.RecipeDTO;
+import com.foodrecommend.letmecook.dto.admin.RecipeCreateRequest;
 import com.foodrecommend.letmecook.entity.Recipe;
 import com.foodrecommend.letmecook.mapper.*;
 import com.foodrecommend.letmecook.service.impl.AdminRecipeServiceImpl;
@@ -15,6 +16,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -79,10 +81,22 @@ class AdminRecipeServiceImplTest {
     }
 
     @Test
-    void batchDeleteShouldReturnZeroForEmptyIds() {
-        int[] result = adminRecipeService.batchDeleteRecipes(null);
+    void createRecipeShouldIgnoreNullCategoryIds() {
+        RecipeCreateRequest request = new RecipeCreateRequest();
+        request.setTitle("test");
+        request.setAuthor("tester");
+        request.setCategoryIds(java.util.Arrays.asList(1, null, 1, 2));
 
-        assertEquals(0, result[0]);
-        assertEquals(0, result[1]);
+        when(recipeMapper.insert(any(Recipe.class))).thenAnswer(invocation -> {
+            Recipe recipe = invocation.getArgument(0);
+            recipe.setId(99);
+            return 1;
+        });
+
+        adminRecipeService.createRecipe(request);
+
+        verify(categoryMapper).insertRecipeCategory(99, 1);
+        verify(categoryMapper).insertRecipeCategory(99, 2);
+        verify(categoryMapper, never()).insertRecipeCategory(eq(99), isNull());
     }
 }

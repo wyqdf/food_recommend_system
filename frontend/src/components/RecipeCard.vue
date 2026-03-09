@@ -85,20 +85,23 @@ const getDifficultyClass = (difficulty) => {
   border-radius: var(--radius-md);
   overflow: hidden;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   transition: var(--transition);
   border: 1px solid var(--border-color);
   box-shadow: var(--shadow-xs);
 }
 
 .recipe-card:hover {
-  transform: translateY(-6px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow-md);
   border-color: #d2dbe8;
 }
 
 .recipe-image {
   position: relative;
-  height: 180px;
+  height: clamp(160px, 17vw, 208px);
   overflow: hidden;
 }
 
@@ -127,16 +130,16 @@ const getDifficultyClass = (difficulty) => {
   top: 0;
   left: 0;
   right: 0;
-  padding: 12px;
+  padding: 10px;
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
 }
 
 .difficulty-tag {
-  padding: 4px 12px;
+  padding: 4px 10px;
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   backdrop-filter: blur(10px);
 }
@@ -160,26 +163,33 @@ const getDifficultyClass = (difficulty) => {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 4px 10px;
+  padding: 4px 8px;
   background: rgba(0, 0, 0, 0.5);
   backdrop-filter: blur(10px);
   border-radius: 20px;
-  font-size: 12px;
+  font-size: 11px;
   color: #fff;
 }
 
 .recipe-info {
-  padding: 16px 16px 14px;
+  padding: 14px 14px 12px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .recipe-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  line-height: 1.35;
+  min-height: 40px;
   transition: var(--transition);
 }
 
@@ -193,13 +203,15 @@ const getDifficultyClass = (difficulty) => {
   gap: 4px;
   font-size: 13px;
   color: var(--text-regular);
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .recipe-meta {
   display: flex;
-  gap: 16px;
-  padding-top: 12px;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
   border-top: 1px solid var(--border-color);
 }
 
@@ -213,5 +225,34 @@ const getDifficultyClass = (difficulty) => {
 
 .meta-item .el-icon {
   color: var(--primary-color);
+}
+
+@media (max-width: 768px) {
+  .recipe-image {
+    height: 160px;
+  }
+
+  .recipe-info {
+    padding: 12px;
+  }
+
+  .recipe-meta {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 430px) {
+  .recipe-image {
+    height: 150px;
+  }
+
+  .recipe-title {
+    font-size: 14px;
+    min-height: 38px;
+  }
+
+  .meta-item {
+    font-size: 12px;
+  }
 }
 </style>

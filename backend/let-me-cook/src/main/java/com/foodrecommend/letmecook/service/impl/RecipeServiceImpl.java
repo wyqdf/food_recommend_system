@@ -301,7 +301,9 @@ public class RecipeServiceImpl implements RecipeService {
         Set<Integer> allCategoryIds = new LinkedHashSet<>();
 
         if (request.getCategoryIds() != null) {
-            allCategoryIds.addAll(request.getCategoryIds());
+            allCategoryIds.addAll(request.getCategoryIds().stream()
+                    .filter(categoryId -> categoryId != null && categoryId > 0)
+                    .collect(Collectors.toList()));
         }
 
         if (request.getCategoryNames() != null) {
@@ -321,7 +323,9 @@ public class RecipeServiceImpl implements RecipeService {
         }
 
         for (Integer categoryId : allCategoryIds) {
-            categoryMapper.insertRecipeCategory(recipeId, categoryId);
+            if (categoryId != null && categoryId > 0) {
+                categoryMapper.insertRecipeCategory(recipeId, categoryId);
+            }
         }
 
         return recipeId;

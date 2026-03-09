@@ -59,8 +59,8 @@ export const userApi = {
 };
 
 export const favoriteApi = {
-  getList() {
-    return request.get("/favorites");
+  getList(params) {
+    return request.get("/favorites", { params });
   },
 
   add(recipeId) {

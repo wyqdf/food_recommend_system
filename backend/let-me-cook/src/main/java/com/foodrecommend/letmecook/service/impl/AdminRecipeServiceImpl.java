@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -105,8 +106,9 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
             }
         }
         
-        if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
-            for (Integer categoryId : request.getCategoryIds()) {
+        List<Integer> validCategoryIds = normalizeCategoryIds(request.getCategoryIds());
+        if (!validCategoryIds.isEmpty()) {
+            for (Integer categoryId : validCategoryIds) {
                 categoryMapper.insertRecipeCategory(recipe.getId(), categoryId);
             }
         }
@@ -163,8 +165,9 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         }
         
         categoryMapper.deleteRecipeCategoriesByRecipeId(id);
-        if (request.getCategoryIds() != null && !request.getCategoryIds().isEmpty()) {
-            for (Integer categoryId : request.getCategoryIds()) {
+        List<Integer> validCategoryIds = normalizeCategoryIds(request.getCategoryIds());
+        if (!validCategoryIds.isEmpty()) {
+            for (Integer categoryId : validCategoryIds) {
                 categoryMapper.insertRecipeCategory(id, categoryId);
             }
         }
@@ -291,11 +294,12 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
             return difficulty == null ? null : difficulty.getName();
         }));
         
-        List<String> categoryNames = categoryMapper.findByRecipeId(recipe.getId());
+        List<Category> categoryRows = categoryMapper.findCategoryInfosByRecipeId(recipe.getId());
         List<RecipeDetailDTO.CategoryInfo> categories = new ArrayList<>();
-        for (String name : categoryNames) {
+        for (Category category : categoryRows) {
             RecipeDetailDTO.CategoryInfo categoryInfo = new RecipeDetailDTO.CategoryInfo();
-            categoryInfo.setName(name);
+            categoryInfo.setId(category.getId());
+            categoryInfo.setName(category.getName());
             categories.add(categoryInfo);
         }
         dto.setCategories(categories);
@@ -367,5 +371,16 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
                 .filter(id -> id != null && id > 0)
                 .distinct()
                 .toArray(Integer[]::new);
+    }
+
+    private List<Integer> normalizeCategoryIds(List<Integer> categoryIds) {
+        if (categoryIds == null || categoryIds.isEmpty()) {
+            return List.of();
+        }
+        return new ArrayList<>(new LinkedHashSet<>(
+                categoryIds.stream()
+                        .filter(id -> id != null && id > 0)
+                        .collect(Collectors.toList())
+        ));
     }
 }
