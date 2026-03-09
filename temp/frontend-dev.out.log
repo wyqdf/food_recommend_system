@@ -1,0 +1,35 @@
+
+> food-frontend@1.0.0 dev
+> vite
+
+Re-optimizing dependencies because vite config has changed
+
+  [32m[1mVITE[22m v5.4.21[39m  [2mready in [0m[1m865[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3000[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m
+[2m19:03:37[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/RecipeManagement.vue, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/RecipeManagement.vue?vue&type=style&index=0&scoped=ef56aa3f&lang.css[22m
+[2m19:11:03[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/components/admin/AdminLayout.vue?vue&type=style&index=0&scoped=7d641bd4&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/components/admin/AdminLayout.vue[22m
+[2m19:11:37[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/RecipeManagement.vue, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/RecipeManagement.vue?vue&type=style&index=0&scoped=ef56aa3f&lang.css[22m
+[2m19:16:40[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/styles/index.css[22m
+[2m19:16:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/components/RecipeGrid.vue?vue&type=style&index=0&scoped=1137564b&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/components/RecipeGrid.vue[22m
+[2m19:17:06[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/components/RecipeCard.vue?vue&type=style&index=0&scoped=e9bb8040&lang.css[22m
+[2m19:17:16[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/components/admin/AttributeTable.vue?vue&type=style&index=0&scoped=b0d722ca&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/components/admin/AttributeTable.vue[22m
+[2m19:17:51[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/App.vue?vue&type=style&index=0&scoped=7a7a37b1&lang.css[22m
+[2m19:17:59[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Home.vue?vue&type=style&index=0&scoped=2dc54a20&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Home.vue[22m
+[2m19:18:13[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Recipes.vue?vue&type=style&index=0&scoped=bc451626&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Recipes.vue[22m
+[2m19:18:39[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Recommend.vue?vue&type=style&index=0&scoped=9cfd9dba&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Recommend.vue[22m
+[2m19:24:11[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/Login.vue?vue&type=style&index=0&scoped=08aaad4e&lang.css[22m
+[2m19:25:41[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/RecipeDetail.vue?vue&type=style&index=0&scoped=0cd76ea7&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/RecipeDetail.vue[22m
+[2m19:26:07[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/UserManagement.vue, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/UserManagement.vue?vue&type=style&index=0&scoped=f69eb650&lang.css[22m
+[2m19:26:14[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/UserManagement.vue[22m
+[2m19:26:29[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/CategoryManagement.vue?vue&type=style&index=0&scoped=30c68e3d&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/CategoryManagement.vue[22m
+[2m19:26:45[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/SystemLogs.vue?vue&type=style&index=0&scoped=76576c97&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/SystemLogs.vue[22m
+[2m19:26:56[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/AttributeManagement.vue?vue&type=style&index=0&scoped=9733ed49&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/AttributeManagement.vue[22m
+[2m19:27:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/Login.vue?vue&type=style&index=0&scoped=f33fe2f2&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/Login.vue[22m
+[2m19:27:37[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/UserManagement.vue?vue&type=style&index=0&scoped=f69eb650&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/UserManagement.vue[22m
+[2m19:27:49[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/SystemLogs.vue?vue&type=style&index=0&scoped=76576c97&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/SystemLogs.vue[22m
+[2m19:27:57[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/CategoryManagement.vue?vue&type=style&index=0&scoped=30c68e3d&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/CategoryManagement.vue[22m
+[2m19:28:10[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/components/admin/AttributeTable.vue[22m
+[2m19:28:23[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/Dashboard.vue?vue&type=style&index=0&scoped=0de618a8&lang.css, /@fs/F:/Desktop/food-recommendation-system/frontend/src/views/admin/Dashboard.vue[22m
