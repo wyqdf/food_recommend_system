@@ -57,7 +57,13 @@ foodrec/
 
 如果你的本地 MySQL 密码不是 `123456`，启动后端前请自行设置环境变量 `DB_PASSWORD`。
 
-首次启动请手动导入数据库结构和种子数据：
+首次启动时，优先使用**完整的 `food_recommend` 数据库备份**。
+
+最推荐：
+
+- 直接导入你们分享的完整数据库导出文件，例如 `food_recommend.sql`
+
+备用方案才是手动执行 `schema.sql + data.sql`：
 
 ```bash
 mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS food_recommend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
@@ -67,9 +73,10 @@ mysql -uroot -p food_recommend < backend/let-me-cook/src/main/resources/data.sql
 
 说明：
 
+- 如果已经拿到完整数据库备份，**不要重复导入** `schema.sql` / `data.sql`
 - `schema.sql` 负责建表
 - `data.sql` 负责写入基础数据和默认账号
-- `data.sql` 适合首次初始化；重复导入前建议先清空库
+- `schema.sql + data.sql` 只作为没有完整数据库备份时的兜底初始化方式
 
 ### 3. 启动后端
 
@@ -108,7 +115,7 @@ npm run dev
 
 ### 5. 默认账号
 
-如果你已经导入了 `data.sql`，可以直接使用：
+如果你已经导入了完整数据库备份，或手动导入了 `data.sql`，可以直接使用：
 
 - 管理员：`admin / 123456`
 - 测试用户：`testuser / 123456`
@@ -176,7 +183,7 @@ mvn spring-boot:run
 ## 最容易卡住的 4 个点
 
 1. `spring.sql.init.mode=never`
-   这意味着后端**不会自动帮你导入** `schema.sql` 和 `data.sql`。
+   这意味着后端**不会自动帮你导入数据库结构或种子数据**。
 
 2. 根目录不是独立的管理端项目
    用户端和管理端都在 `frontend/`。

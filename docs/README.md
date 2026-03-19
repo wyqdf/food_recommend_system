@@ -4,6 +4,8 @@
 > **最后更新**: 2026-03-19 18:05:00
 > **维护原则**: 以仓库代码、`schema.sql`、运行日志与当前 API 返回为准
 
+> **启动提示**: 第一次本地跑项目时，优先导入完整的 `food_recommend` 数据库备份；`schema.sql + data.sql` 作为兜底初始化方案。
+
 ## 项目概况
 
 - 后端：Spring Boot 3.2.2 + MyBatis + MySQL 8.0
