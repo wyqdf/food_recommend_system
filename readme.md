@@ -23,6 +23,23 @@
 - Node.js：建议 18+
 - 构建工具：Maven 3.9+
 
+## 最小依赖清单
+
+第一次把项目跑起来，实际上只需要这些：
+
+- 必需：MySQL 8
+- 必需：Java 21
+- 必需：Maven 3.9+
+- 必需：Node.js 18+
+- 可选：Docker Desktop
+- 可选：Elasticsearch
+
+说明：
+
+- **不启动 Elasticsearch 也可以先把项目跑起来**
+- **不配置 OSS 也不影响本地启动**
+- 第一次上手建议先跑 `MySQL + 后端 8081 + 前端 3000`
+
 ## 仓库结构
 
 ```text
@@ -62,6 +79,19 @@ foodrec/
 最推荐：
 
 - 直接导入你们分享的完整数据库导出文件，例如 `food_recommend.sql`
+
+如果你拿到的是压缩包，例如 `food_recommend.sql.gz`，请先解压再导入。
+
+命令行导入示例：
+
+```bash
+mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS food_recommend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+mysql -uroot -p food_recommend < food_recommend.sql
+```
+
+如果分享包里的文件名不是 `food_recommend.sql`，把上面的文件名替换成实际文件名即可。
+
+如果你更习惯图形界面，也可以用 Navicat / DataGrip / MySQL Workbench 直接导入整库备份。
 
 备用方案才是手动执行 `schema.sql + data.sql`：
 
@@ -119,6 +149,20 @@ npm run dev
 
 - 管理员：`admin / 123456`
 - 测试用户：`testuser / 123456`
+
+## 启动成功判定
+
+如果下面 4 条都成立，说明别人基本已经本地跑通了：
+
+1. 后端接口可访问：
+   - 打开 `http://127.0.0.1:8081/api/categories`
+   - 能看到 JSON 返回，不是 500/404
+2. 前端首页可访问：
+   - 打开 `http://127.0.0.1:3000`
+3. 管理员登录页可访问：
+   - 打开 `http://127.0.0.1:3000/admin/login`
+4. 默认管理员可登录：
+   - `admin / 123456`
 
 ## 当前推荐的本地开发口径
 
