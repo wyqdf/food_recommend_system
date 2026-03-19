@@ -13,6 +13,7 @@ export const useUserStore = defineStore('user', () => {
     token.value = res.data.token
     user.value = res.data.user
     localStorage.setItem('token', res.data.token)
+    await fetchProfile()
     return res
   }
 

@@ -16,7 +16,7 @@ public interface AdvancedStatisticsMapper {
                         "SELECT " +
                         "  i.id as ingredient_id, " +
                         "  i.name as ingredient_name, " +
-                        "  COUNT(ri.recipe_id) as recipe_count " +
+                        "  COUNT(DISTINCT ri.recipe_id) as recipe_count " +
                         "FROM ingredients i " +
                         "INNER JOIN recipe_ingredients ri ON i.id = ri.ingredient_id " +
                         "GROUP BY i.id, i.name " +
@@ -74,11 +74,11 @@ public interface AdvancedStatisticsMapper {
                         "  COALESCE(c.comment_count, 0) as comment_count, " +
                         "  (COALESCE(r.recipe_count, 0) * 10 + COALESCE(c.comment_count, 0) * 5) as total_score " +
                         "FROM users u " +
-                        "LEFT JOIN (SELECT author_uid, COUNT(*) as recipe_count FROM recipes WHERE author_uid REGEXP '^[0-9]+$' GROUP BY author_uid) r ON CAST(u.id AS CHAR) = r.author_uid "
+                        "LEFT JOIN (SELECT CAST(author_uid AS UNSIGNED) as user_id, COUNT(*) as recipe_count FROM recipes WHERE author_uid IS NOT NULL AND author_uid != '' GROUP BY author_uid) r ON u.id = r.user_id "
                         +
-                        "LEFT JOIN (SELECT user_id, COUNT(*) as comment_count FROM comments GROUP BY user_id) c ON u.id = c.user_id "
+                        "LEFT JOIN (SELECT user_id, COUNT(*) as comment_count FROM comments WHERE user_id IS NOT NULL GROUP BY user_id) c ON u.id = c.user_id "
                         +
-                        "WHERE r.recipe_count > 0 OR c.comment_count > 0 " +
+                        "WHERE COALESCE(r.recipe_count, 0) > 0 OR COALESCE(c.comment_count, 0) > 0 " +
                         "ORDER BY total_score DESC " +
                         "LIMIT #{limit}" +
                         "</script>")

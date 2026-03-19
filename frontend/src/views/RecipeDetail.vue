@@ -4,6 +4,9 @@
     <template v-else-if="recipe">
       <div class="recipe-header">
         <h1>{{ recipe.title || recipe.name }}</h1>
+        <div v-if="recipe.author" class="recipe-author-line">
+          作者：{{ recipe.author }}
+        </div>
         <div class="recipe-meta">
           <span><el-icon>
               <Star />
@@ -140,6 +143,7 @@
             <el-button type="primary" :icon="Star" @click="toggleFavorite" :loading="favoriting">
               {{ isFavorited ? '取消收藏' : '收藏菜谱' }}
             </el-button>
+            <el-button type="success" :icon="VideoPlay" @click="goCookMode">进入烹饪模式</el-button>
             <el-button :icon="Share">分享</el-button>
           </el-card>
 
@@ -169,12 +173,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { User, View, Star, ChatDotRound, Share, Timer, Dish, CollectionTag, Picture } from '@element-plus/icons-vue'
+import { User, View, Star, ChatDotRound, Share, Timer, Dish, CollectionTag, Picture, VideoPlay } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { recipeApi, favoriteApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
+import { flushBehaviorEvents, trackBehavior } from '@/utils/tracker'
 
 const route = useRoute()
 const router = useRouter()
@@ -194,6 +199,33 @@ const defaultImage = '/images/food-placeholder.svg'
 const commentPage = ref(1)
 const commentPageSize = ref(10)
 const commentTotal = ref(0)
+const pageEnterAt = ref(Date.now())
+
+const loadFavoriteState = async (recipeId) => {
+  if (!userStore.isLoggedIn || !recipeId) {
+    isFavorited.value = false
+    return
+  }
+  try {
+    const favRes = await favoriteApi.check(recipeId)
+    isFavorited.value = Boolean(favRes.data?.isFavorite)
+  } catch (error) {
+    isFavorited.value = false
+  }
+}
+
+const loadRecommendList = async (recipeId) => {
+  if (!recipeId) {
+    recommendList.value = []
+    return
+  }
+  try {
+    const recommendRes = await recipeApi.getSimilar(recipeId, { limit: 5 })
+    recommendList.value = Array.isArray(recommendRes.data) ? recommendRes.data : (recommendRes.data?.list || [])
+  } catch (error) {
+    recommendList.value = []
+  }
+}
 
 const descriptionParagraphs = computed(() => {
   if (!recipe.value?.description) return []
@@ -235,33 +267,47 @@ const fetchDetail = async () => {
 }
 
 onMounted(async () => {
+  pageEnterAt.value = Date.now()
   await fetchDetail()
-  if (userStore.isLoggedIn) {
-    const favRes = await favoriteApi.check(route.params.id)
-    isFavorited.value = favRes.data.isFavorite
-  }
-
-  await fetchComments()
-
-  const recommendRes = await recipeApi.getSimilar(route.params.id, { limit: 5 })
-  recommendList.value = Array.isArray(recommendRes.data) ? recommendRes.data : (recommendRes.data.list || [])
+  if (!recipe.value) return
+  trackBehavior('page_view', { sourcePage: 'recipe_detail', recipeId: Number(route.params.id) })
+  await Promise.allSettled([
+    loadFavoriteState(route.params.id),
+    fetchComments({ silent: true }),
+    loadRecommendList(route.params.id)
+  ])
 })
 
-watch(() => route.params.id, async (newId) => {
+watch(() => route.params.id, async (newId, oldId) => {
   if (newId) {
-    loading.value = true
+    reportViewDuration(Number(oldId))
+    pageEnterAt.value = Date.now()
     await fetchDetail()
-    if (userStore.isLoggedIn) {
-      const favRes = await favoriteApi.check(newId)
-      isFavorited.value = favRes.data.isFavorite
-    }
+    if (!recipe.value) return
+    trackBehavior('page_view', { sourcePage: 'recipe_detail', recipeId: Number(newId) })
     commentPage.value = 1
-    await fetchComments()
-    const recommendRes = await recipeApi.getSimilar(newId, { limit: 5 })
-    recommendList.value = Array.isArray(recommendRes.data) ? recommendRes.data : (recommendRes.data.list || [])
-    loading.value = false
+    await Promise.allSettled([
+      loadFavoriteState(newId),
+      fetchComments({ silent: true }),
+      loadRecommendList(newId)
+    ])
   }
 })
+
+onBeforeUnmount(() => {
+  reportViewDuration(Number(route.params.id))
+  flushBehaviorEvents()
+})
+
+const reportViewDuration = (recipeId) => {
+  if (!recipeId || !pageEnterAt.value) return
+  const durationMs = Math.max(0, Date.now() - pageEnterAt.value)
+  trackBehavior('recipe_view', {
+    sourcePage: 'recipe_detail',
+    recipeId,
+    durationMs
+  })
+}
 
 const toggleFavorite = async () => {
   if (!userStore.isLoggedIn) {
@@ -274,10 +320,18 @@ const toggleFavorite = async () => {
     if (isFavorited.value) {
       await favoriteApi.remove(recipe.value.id)
       isFavorited.value = false
+      trackBehavior('favorite_remove', {
+        sourcePage: 'recipe_detail',
+        recipeId: recipe.value.id
+      })
       ElMessage.success('已取消收藏')
     } else {
       await favoriteApi.add(recipe.value.id)
       isFavorited.value = true
+      trackBehavior('favorite_add', {
+        sourcePage: 'recipe_detail',
+        recipeId: recipe.value.id
+      })
       ElMessage.success('收藏成功')
     }
   } finally {
@@ -305,10 +359,18 @@ const submitComment = async () => {
   }
 }
 
-const fetchComments = async () => {
-  const res = await commentApi.getList(route.params.id, { page: commentPage.value, pageSize: commentPageSize.value })
-  comments.value = res.data.list || []
-  commentTotal.value = res.data.total || 0
+const fetchComments = async (options = {}) => {
+  try {
+    const res = await commentApi.getList(route.params.id, { page: commentPage.value, pageSize: commentPageSize.value })
+    comments.value = res.data.list || []
+    commentTotal.value = res.data.total || 0
+  } catch (error) {
+    comments.value = []
+    commentTotal.value = 0
+    if (!options.silent) {
+      ElMessage.error('评论加载失败，请稍后重试')
+    }
+  }
 }
 
 const handleCommentPageChange = (page) => {
@@ -318,6 +380,20 @@ const handleCommentPageChange = (page) => {
 
 const goRecipe = (id) => {
   router.push(`/recipe/${id}`)
+}
+
+const goCookMode = () => {
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录后开启烹饪模式')
+    router.push('/login')
+    return
+  }
+  if (!recipe.value?.id) return
+  trackBehavior('cooking_mode_enter', {
+    sourcePage: 'recipe_detail',
+    recipeId: recipe.value.id
+  })
+  router.push(`/recipe/${recipe.value.id}/cook`)
 }
 
 
@@ -330,6 +406,12 @@ const goRecipe = (id) => {
 
 .recipe-header {
   margin-bottom: 24px;
+}
+
+.recipe-author-line {
+  margin: 8px 0 12px;
+  color: var(--text-regular);
+  font-size: 14px;
 }
 
 .recipe-header h1 {

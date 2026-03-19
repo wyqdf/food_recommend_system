@@ -40,23 +40,56 @@
       </el-tabs>
     </div>
 
+    <div v-if="activeTab === 'personal' && categoryOptions.length" class="scene-filter">
+      <span class="scene-label">分类筛选：</span>
+      <el-segmented v-model="selectedCategoryId" :options="categorySegmentOptions" @change="fetchRecommend" />
+    </div>
+
     <RecipeGrid :recipes="recipeList" :loading="loading" />
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
 import { Star, TrendCharts, Clock } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
+import { trackBehavior } from '@/utils/tracker'
+
+const RECOMMEND_CATEGORY_NAMES = ['家常菜', '快手菜', '减肥瘦身', '宴客菜', '夜宵', '下饭菜', '儿童', '早餐']
 
 const activeTab = ref('personal')
 const recipeList = ref([])
 const loading = ref(false)
 const cache = new Map()
+const selectedCategoryId = ref('')
+const categoryOptions = ref([])
+
+const categorySegmentOptions = computed(() => {
+  const options = [{ label: '全部', value: '' }]
+  categoryOptions.value.forEach(category => {
+    options.push({ label: category.name, value: category.id })
+  })
+  return options
+})
+
+const loadCategories = async () => {
+  try {
+    const res = await recipeApi.getCategories()
+    const source = Array.isArray(res.data) ? res.data : []
+    const orderMap = new Map(RECOMMEND_CATEGORY_NAMES.map((name, index) => [name, index]))
+    categoryOptions.value = source
+      .filter(item => item?.name && orderMap.has(item.name))
+      .sort((a, b) => orderMap.get(a.name) - orderMap.get(b.name))
+  } catch (error) {
+    categoryOptions.value = []
+  }
+}
 
 const fetchRecommend = async () => {
-  const cacheKey = `${activeTab.value}_12`
+  const categoryKey = activeTab.value === 'personal' ? selectedCategoryId.value || 'all' : 'all'
+  const cacheKey = `${activeTab.value}_${categoryKey}_12`
   if (cache.has(cacheKey)) {
     recipeList.value = cache.get(cacheKey)
     return
@@ -64,16 +97,31 @@ const fetchRecommend = async () => {
 
   loading.value = true
   try {
-    const res = await recipeApi.getRecommend({ type: activeTab.value, limit: 12 })
+    const params = { type: activeTab.value, limit: 12 }
+    if (activeTab.value === 'personal' && selectedCategoryId.value) {
+      params.categoryId = selectedCategoryId.value
+    }
+    const res = await recipeApi.getRecommend(params)
     recipeList.value = res.data.list || []
     cache.set(cacheKey, recipeList.value)
+    const selectedCategoryName = categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
+    trackBehavior('recommend_request', {
+      sourcePage: 'recommend',
+      sceneCode: null,
+      extra: { type: activeTab.value, size: recipeList.value.length, categoryId: params.categoryId || null, categoryName: selectedCategoryName }
+    })
+  } catch (error) {
+    recipeList.value = []
+    ElMessage.warning('推荐加载较慢，请稍后重试')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(() => {
-  fetchRecommend()
+onMounted(async () => {
+  await loadCategories()
+  trackBehavior('page_view', { sourcePage: 'recommend' })
+  await fetchRecommend()
 })
 </script>
 
@@ -126,6 +174,19 @@ onMounted(() => {
   padding: 0 20px;
   height: 46px;
   line-height: 46px;
+}
+
+.scene-filter {
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scene-label {
+  color: var(--text-secondary);
+  font-size: 14px;
+  flex-shrink: 0;
 }
 
 @media (max-width: 768px) {

@@ -1,10 +1,22 @@
 # 美食推荐系统 - 管理员 API 接口文档
 
-> **版本**: v2.0  
-> **最后更新**: 2026-03-01  
-> **基准 URL**: `http://localhost:8080/api/admin`  
+> **版本**: v2.3  
+> **最后更新**: 2026-03-19 10:35:23  
+> **基准 URL**: `http://localhost:8081/api/admin`  
 > **数据格式**: JSON  
 > **字符编码**: UTF-8
+
+## 2026-03-19 现行实现说明
+
+- 当前管理员日志底表为 `operation_logs`，不是旧文档中的 `system_logs`。
+- 当前日志接口已对接 `GET /api/admin/logs`。
+- 管理端鉴权仍使用 `Authorization: Bearer <admin_token>`。
+- 新增搜索索引管理接口：
+  - `POST /api/admin/search/index/rebuild`
+  - `GET /api/admin/search/index/status`
+- 当前 Search V2 已上线到本地运行态，别名 `recipes_search` 指向 `recipes_search_v2`。
+- 管理端仪表盘已新增“搜索索引”卡片，可直接查看搜索引擎、目标索引、重建阶段与进度。
+- 本文中若后续章节仍出现 `system_logs`，请以 `operation_logs` 与当前后端实现为准。
 
 ---
 
@@ -17,8 +29,9 @@
 5. [分类管理](#分类管理)
 6. [属性管理](#属性管理)
 7. [统计管理](#统计管理)
-8. [日志管理](#日志管理)
-9. [错误码说明](#错误码说明)
+8. [搜索索引管理](#搜索索引管理)
+9. [日志管理](#日志管理)
+10. [错误码说明](#错误码说明)
 
 ---
 
@@ -47,20 +60,20 @@ CREATE TABLE admins (
 - `pk`: id (主键)
 - `uk_username`: username (唯一索引)
 
-#### 系统日志表 (system_logs)
+#### 操作日志表 (operation_logs)
 
 ```sql
-CREATE TABLE system_logs (
+CREATE TABLE operation_logs (
     id INT PRIMARY KEY AUTO_INCREMENT,
     admin_id INT,
-    operation VARCHAR(100) COMMENT '操作类型',
-    module VARCHAR(50) COMMENT '模块',
-    content TEXT COMMENT '操作内容',
+    action VARCHAR(50) NOT NULL COMMENT '操作类型',
+    target_type VARCHAR(50) COMMENT '目标对象类型',
+    target_id INT COMMENT '目标对象 ID',
+    detail TEXT COMMENT '操作内容',
     ip VARCHAR(50),
-    user_agent VARCHAR(200),
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (admin_id) REFERENCES admins(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统日志表';
+    FOREIGN KEY (admin_id) REFERENCES admins(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='操作日志表';
 ```
 
 **索引**:
@@ -162,7 +175,7 @@ ALTER TABLE ingredients ADD COLUMN recipe_count INT DEFAULT 0;
 3. 检查管理员状态（status=1）
 4. 生成 JWT Token（包含 adminId 和 role）
 5. 更新 last_login_time 和 last_login_ip
-6. 记录登录日志到 system_logs
+6. 记录登录日志到 operation_logs
 
 **错误响应**:
 
@@ -1693,6 +1706,102 @@ LIMIT 10;
 
 ---
 
+## 搜索索引管理
+
+### 1. 获取搜索索引状态
+
+**接口地址**: `GET /search/index/status`
+
+**功能描述**: 获取当前搜索引擎、索引别名、当前索引、目标索引、重建阶段、重建进度与最近错误
+
+**请求头**:
+```
+Authorization: Bearer <admin_token>
+```
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": {
+    "engine": "elasticsearch",
+    "indexAlias": "recipes_search",
+    "indexName": "recipes_search_v2",
+    "currentIndex": "recipes_search_v2",
+    "targetIndex": "recipes_search_v2",
+    "phase": "completed",
+    "running": false,
+    "total": 309462,
+    "processed": 309462,
+    "success": 309462,
+    "failed": 0,
+    "startedAt": "2026-03-19T10:16:03.3375086",
+    "finishedAt": "2026-03-19T10:30:31.0692443",
+    "lastError": null
+  }
+}
+```
+
+**响应字段说明**:
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| engine | string | 当前搜索引擎，`mysql` 或 `elasticsearch` |
+| indexAlias | string | 搜索别名 |
+| indexName | string | 配置中的索引名 |
+| currentIndex | string | 当前实际写入/查询索引 |
+| targetIndex | string | 本轮重建目标索引 |
+| phase | string | 当前阶段：`idle / building / swapping / completed / failed` |
+| running | boolean | 是否有重建任务正在执行 |
+| total | long | 本轮计划重建总数 |
+| processed | long | 已处理数量 |
+| success | long | 成功写入数量 |
+| failed | long | 失败数量 |
+| startedAt | string/null | 任务开始时间 |
+| finishedAt | string/null | 任务结束时间 |
+| lastError | string/null | 最近一次 ES 初始化/重建/同步错误 |
+
+**说明**:
+
+- 当前仓库默认配置仍为 `engine=mysql`，但本地运行中的宿主机后端已切到 `engine=elasticsearch`。
+- 当前重建任务会显式创建目标索引，再通过 alias 原子切换到新索引版本。
+- 即使仍处于 `mysql` 引擎，也可以先通过该接口查看 ES 索引初始化情况与最近错误。
+
+---
+
+### 2. 手动触发搜索索引重建
+
+**接口地址**: `POST /search/index/rebuild`
+
+**功能描述**: 手动启动一次搜索索引全量重建任务
+
+**请求头**:
+```
+Authorization: Bearer <admin_token>
+```
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": "搜索索引重建任务已开始"
+}
+```
+
+**说明**:
+
+- 重建任务为后台异步执行，HTTP 请求不会阻塞等待全量完成。
+- 同一时间只允许一个重建任务运行，若已有任务进行中，会返回“搜索索引重建任务正在执行中”。
+- 当前实现只重建 `status=1` 的公开食谱。
+- 当前 Search V2 会重建 `recipes_search_v2`，完成后将 alias `recipes_search` 原子切换到目标索引。
+- 若 ES 当前不可用，任务会快速结束，并在状态接口中记录 `lastError`。
+
+---
+
 ## 日志管理
 
 ### 1. 获取系统日志列表
@@ -1757,23 +1866,24 @@ LIMIT 10;
 | page | int | 当前页码 |
 | pageSize | int | 每页数量 |
 
-**数据库表**: `system_logs`, `admins`
+**数据库表**: `operation_logs`, `admins`
 
 **使用的索引**:
-- `system_logs.pk` (主键)
-- `idx_admin_id` (admin_id，按管理员筛选)
-- `idx_module` (module，按模块筛选)
-- `idx_create_time` (create_time，时间排序)
+- `operation_logs.pk` (主键)
+- `idx_operation_logs_admin_time` (admin_id, create_time，按管理员筛选与时间排序)
+- `idx_operation_logs_target_type` (target_type，按模块筛选)
+- `idx_operation_logs_action` (action，按操作筛选)
+- `idx_operation_logs_create_time` (create_time，时间排序)
 
 **SQL 示例**:
 
 ```sql
 SELECT sl.id, sl.admin_id, a.username as admin_name,
-       sl.operation, sl.module, sl.content, sl.ip,
+       sl.action as operation, sl.target_type as module, sl.detail as content, sl.ip,
        sl.user_agent, sl.create_time
-FROM system_logs sl
+FROM operation_logs sl
 LEFT JOIN admins a ON sl.admin_id = a.id
-WHERE sl.module = ?
+WHERE sl.target_type = ?
   AND sl.create_time BETWEEN ? AND ?
 ORDER BY sl.create_time DESC
 LIMIT 0, 10;
@@ -1841,10 +1951,11 @@ LIMIT 0, 10;
 |------|--------|------|------|------|
 | admins | pk | id | 主键 | 管理员 ID |
 | admins | uk_username | username | 唯一索引 | 管理员名唯一 |
-| system_logs | pk | id | 主键 | 日志 ID |
-| system_logs | idx_admin_id | admin_id | 外键索引 | 按管理员查询 |
-| system_logs | idx_module | module | 普通索引 | 按模块查询 |
-| system_logs | idx_create_time | create_time | 普通索引 | 时间排序 |
+| operation_logs | pk | id | 主键 | 日志 ID |
+| operation_logs | idx_operation_logs_admin_time | admin_id, create_time | 复合索引 | 按管理员查询与时间排序 |
+| operation_logs | idx_operation_logs_target_type | target_type | 普通索引 | 按模块查询 |
+| operation_logs | idx_operation_logs_action | action | 普通索引 | 按操作查询 |
+| operation_logs | idx_operation_logs_create_time | create_time | 普通索引 | 时间排序 |
 | users | pk | id | 主键 | 用户 ID |
 | users | uk_old_id | old_id | 唯一索引 | 原始用户 ID 映射 |
 | users | idx_users_status | status | 普通索引 | 状态筛选 |
@@ -1883,5 +1994,5 @@ LIMIT 0, 10;
 ---
 
 **文档维护**: 开发团队  
-**最后更新**: 2026-03-01  
-**版本**: v2.0
+**最后更新**: 2026-03-19 10:35:23  
+**版本**: v2.3

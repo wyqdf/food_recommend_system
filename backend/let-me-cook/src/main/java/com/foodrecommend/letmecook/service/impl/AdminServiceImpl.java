@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -111,9 +112,37 @@ public class AdminServiceImpl implements AdminService {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.min(Math.max(pageSize, 1), 200);
         int offset = (safePage - 1) * safePageSize;
-
-        List<UserDTO> list = adminUserMapper.findUsers(keyword, status, offset, safePageSize);
         long total = adminUserMapper.countUsers(keyword, status);
+        if (total <= 0) {
+            return new PageResult<>(List.of(), 0, safePage, safePageSize);
+        }
+
+        List<Integer> userIds = adminUserMapper.findUserIds(keyword, status, offset, safePageSize);
+        if (userIds == null || userIds.isEmpty()) {
+            return new PageResult<>(List.of(), total, safePage, safePageSize);
+        }
+
+        List<UserDTO> pageUsers = adminUserMapper.findUsersByIds(userIds);
+        Map<Integer, UserDTO> userMap = new HashMap<>();
+        for (UserDTO user : pageUsers) {
+            if (user != null && user.getId() != null) {
+                userMap.put(user.getId(), user);
+            }
+        }
+
+        Map<Integer, Integer> favoritesCountMap = toCountMap(adminUserMapper.countFavoritesByUserIds(userIds));
+        Map<Integer, Integer> commentsCountMap = toCountMap(adminUserMapper.countCommentsByUserIds(userIds));
+
+        List<UserDTO> list = new ArrayList<>(userIds.size());
+        for (Integer userId : userIds) {
+            UserDTO user = userMap.get(userId);
+            if (user == null) {
+                continue;
+            }
+            user.setFavoritesCount(favoritesCountMap.getOrDefault(userId, 0));
+            user.setCommentsCount(commentsCountMap.getOrDefault(userId, 0));
+            list.add(user);
+        }
         return new PageResult<>(list, total, safePage, safePageSize);
     }
 
@@ -441,6 +470,21 @@ public class AdminServiceImpl implements AdminService {
 
     private int safeInt(Integer value) {
         return value != null ? value : 0;
+    }
+
+    private Map<Integer, Integer> toCountMap(List<Map<String, Object>> rows) {
+        Map<Integer, Integer> countMap = new HashMap<>();
+        if (rows == null || rows.isEmpty()) {
+            return countMap;
+        }
+        for (Map<String, Object> row : rows) {
+            Integer userId = MapValueUtils.getInt(row, "userId", "user_id");
+            if (userId == null) {
+                continue;
+            }
+            countMap.put(userId, MapValueUtils.getIntOrDefault(row, 0, "total", "count"));
+        }
+        return countMap;
     }
 
     private List<StatisticsDTO.TrendItem> convertToTrendList(List<Map<String, Object>> data) {

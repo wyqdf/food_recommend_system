@@ -203,6 +203,75 @@
     </el-divider>
 
     <el-row :gutter="20" class="mb-4">
+      <el-col :span="24">
+        <el-card class="search-index-card" shadow="hover">
+          <template #header>
+            <div class="card-header search-index-card__header">
+              <div class="search-index-card__title">
+                <el-icon>
+                  <Search />
+                </el-icon>
+                <span>搜索索引</span>
+              </div>
+              <el-button type="primary" size="small" :loading="indexRebuilding" @click="handleRebuildSearchIndex">
+                {{ searchIndexStatus.running ? '重建中...' : '重建索引' }}
+              </el-button>
+            </div>
+          </template>
+
+          <div class="search-index-card__grid">
+            <div class="search-index-card__item">
+              <span class="search-index-card__label">当前引擎</span>
+              <strong>{{ searchIndexStatus.engine || 'mysql' }}</strong>
+            </div>
+            <div class="search-index-card__item">
+              <span class="search-index-card__label">索引别名</span>
+              <strong>{{ searchIndexStatus.indexAlias || '--' }}</strong>
+            </div>
+            <div class="search-index-card__item">
+              <span class="search-index-card__label">目标索引</span>
+              <strong>{{ searchIndexStatus.targetIndex || '--' }}</strong>
+            </div>
+            <div class="search-index-card__item">
+              <span class="search-index-card__label">当前索引</span>
+              <strong>{{ searchIndexStatus.currentIndex || '--' }}</strong>
+            </div>
+            <div class="search-index-card__item">
+              <span class="search-index-card__label">重建阶段</span>
+              <el-tag :type="getSearchIndexPhaseType(searchIndexStatus.phase)" effect="plain">
+                {{ getSearchIndexPhaseLabel(searchIndexStatus.phase) }}
+              </el-tag>
+            </div>
+          </div>
+
+          <el-progress
+            :percentage="searchIndexProgress"
+            :status="searchIndexStatus.failed > 0 ? 'exception' : undefined"
+            :indeterminate="searchIndexStatus.running && !searchIndexStatus.total"
+            :show-text="Boolean(searchIndexStatus.total)"
+          />
+
+          <div class="search-index-card__meta">
+            <span>总数 {{ searchIndexStatus.total || 0 }}</span>
+            <span>已处理 {{ searchIndexStatus.processed || 0 }}</span>
+            <span>成功 {{ searchIndexStatus.success || 0 }}</span>
+            <span>失败 {{ searchIndexStatus.failed || 0 }}</span>
+            <span>开始时间 {{ formatDateTime(searchIndexStatus.startedAt) }}</span>
+            <span>结束时间 {{ formatDateTime(searchIndexStatus.finishedAt) }}</span>
+          </div>
+
+          <el-alert
+            v-if="searchIndexStatus.lastError"
+            type="warning"
+            :closable="false"
+            show-icon
+            :title="searchIndexStatus.lastError"
+          />
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-row :gutter="20" class="mb-4">
       <el-col :xs="24" :sm="12" :md="6">
         <el-card class="stat-card quality-card" shadow="hover">
           <div class="stat-card-header">
@@ -422,14 +491,14 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
+import { computed, ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   User, Food, List, Comment, Top, Bottom,
-  Star, StarFilled, ChatDotRound, CircleClose, Orange, Van,
+  Star, StarFilled, ChatDotRound, CircleClose, Orange, Van, Search,
   TrendCharts, Medal, DataLine, Timer, Calendar, Refresh
 } from '@element-plus/icons-vue'
-import { adminStatisticsApi } from '@/api/admin'
+import { adminSearchApi, adminStatisticsApi } from '@/api/admin'
 import * as echarts from 'echarts/core'
 import { BarChart, LineChart, PieChart } from 'echarts/charts'
 import { GridComponent, LegendComponent, TooltipComponent } from 'echarts/components'
@@ -498,6 +567,31 @@ const qualityAnalysis = ref({
 })
 
 const refreshing = ref(false)
+const indexRebuilding = ref(false)
+const searchIndexStatus = reactive({
+  engine: 'mysql',
+  indexAlias: 'recipes_search',
+  indexName: 'recipes_search_v2',
+  currentIndex: '',
+  targetIndex: 'recipes_search_v2',
+  phase: 'idle',
+  running: false,
+  total: 0,
+  processed: 0,
+  success: 0,
+  failed: 0,
+  startedAt: null,
+  finishedAt: null,
+  lastError: ''
+})
+let searchIndexPollTimer = null
+
+const searchIndexProgress = computed(() => {
+  if (!searchIndexStatus.total) {
+    return searchIndexStatus.running ? 0 : (searchIndexStatus.processed > 0 ? 100 : 0)
+  }
+  return Math.min(100, Math.round((searchIndexStatus.processed / searchIndexStatus.total) * 100))
+})
 
 const handleRefreshStatistics = async () => {
   refreshing.value = true
@@ -514,6 +608,111 @@ const handleRefreshStatistics = async () => {
     ElMessage.error('刷新失败，请稍后重试')
   } finally {
     refreshing.value = false
+  }
+}
+
+const applySearchIndexStatus = (data = {}) => {
+  searchIndexStatus.engine = data.engine || 'mysql'
+  searchIndexStatus.indexAlias = data.indexAlias || 'recipes_search'
+  searchIndexStatus.indexName = data.indexName || 'recipes_search_v2'
+  searchIndexStatus.currentIndex = data.currentIndex || ''
+  searchIndexStatus.targetIndex = data.targetIndex || searchIndexStatus.indexName
+  searchIndexStatus.phase = data.phase || 'idle'
+  searchIndexStatus.running = Boolean(data.running)
+  searchIndexStatus.total = Number(data.total || 0)
+  searchIndexStatus.processed = Number(data.processed || 0)
+  searchIndexStatus.success = Number(data.success || 0)
+  searchIndexStatus.failed = Number(data.failed || 0)
+  searchIndexStatus.startedAt = data.startedAt || null
+  searchIndexStatus.finishedAt = data.finishedAt || null
+  searchIndexStatus.lastError = data.lastError || ''
+
+  if (searchIndexStatus.running) {
+    startSearchIndexPolling()
+  } else {
+    stopSearchIndexPolling()
+    indexRebuilding.value = false
+  }
+}
+
+const getSearchIndexPhaseLabel = (phase) => {
+  switch (phase) {
+    case 'building':
+      return '构建中'
+    case 'swapping':
+      return '切换中'
+    case 'completed':
+      return '已完成'
+    case 'failed':
+      return '失败'
+    default:
+      return searchIndexStatus.running ? '执行中' : '空闲'
+  }
+}
+
+const getSearchIndexPhaseType = (phase) => {
+  switch (phase) {
+    case 'building':
+    case 'swapping':
+      return 'warning'
+    case 'failed':
+      return 'danger'
+    case 'completed':
+      return 'success'
+    default:
+      return 'info'
+  }
+}
+
+const startSearchIndexPolling = () => {
+  if (searchIndexPollTimer) return
+  searchIndexPollTimer = window.setInterval(() => {
+    loadSearchIndexStatus()
+  }, 3000)
+}
+
+const stopSearchIndexPolling = () => {
+  if (!searchIndexPollTimer) return
+  window.clearInterval(searchIndexPollTimer)
+  searchIndexPollTimer = null
+}
+
+const loadSearchIndexStatus = async ({ silent = true } = {}) => {
+  try {
+    const res = await adminSearchApi.getIndexStatus()
+    if (res.code === 200 && res.data) {
+      applySearchIndexStatus(res.data)
+    }
+  } catch (error) {
+    stopSearchIndexPolling()
+    indexRebuilding.value = false
+    if (!silent) {
+      ElMessage.error('加载搜索索引状态失败')
+    }
+  }
+}
+
+const handleRebuildSearchIndex = async () => {
+  if (searchIndexStatus.running) {
+    startSearchIndexPolling()
+    return
+  }
+
+  indexRebuilding.value = true
+  try {
+    const res = await adminSearchApi.rebuildIndex()
+    if (res.code === 200) {
+      ElMessage.success(res.data || '搜索索引重建任务已开始')
+      await loadSearchIndexStatus({ silent: false })
+      startSearchIndexPolling()
+    } else {
+      ElMessage.error(res.message || '启动搜索索引重建失败')
+      indexRebuilding.value = false
+    }
+  } catch (error) {
+    console.error('启动搜索索引重建失败:', error)
+    ElMessage.error('启动搜索索引重建失败')
+    indexRebuilding.value = false
   }
 }
 
@@ -719,6 +918,13 @@ const calcTrendRate = (trend = [], valueGetter) => {
 }
 
 const formatTrend = (value) => `${Math.abs(value).toFixed(1)}%`
+
+const formatDateTime = (value) => {
+  if (!value) return '--'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return date.toLocaleString('zh-CN', { hour12: false })
+}
 
 const getTrendClass = (value) => {
   if (value === null) return ''
@@ -958,7 +1164,8 @@ const loadDashboardData = async () => {
   await Promise.all([
     loadOverview(),
     loadStatistics(),
-    loadAdvancedStatistics()
+    loadAdvancedStatistics(),
+    loadSearchIndexStatus()
   ])
 }
 
@@ -970,6 +1177,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   chartInstances.forEach(chart => chart.dispose())
   chartInstances.clear()
+  stopSearchIndexPolling()
   window.removeEventListener('resize', handleResize)
 })
 </script>
@@ -1243,6 +1451,48 @@ onBeforeUnmount(() => {
   }
 }
 
+.search-index-card__header {
+  gap: 16px;
+}
+
+.search-index-card__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.search-index-card__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.search-index-card__item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: #faf7f3;
+  border: 1px solid #f0e3d7;
+}
+
+.search-index-card__label {
+  font-size: 12px;
+  color: #909399;
+}
+
+.search-index-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 18px;
+  margin: 14px 0;
+  font-size: 13px;
+  color: #606266;
+}
+
 @media (max-width: 768px) {
   .stat-card-content {
     .stat-number {
@@ -1256,6 +1506,10 @@ onBeforeUnmount(() => {
 
   .chart-container-large {
     height: 300px !important;
+  }
+
+  .search-index-card__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 </style>

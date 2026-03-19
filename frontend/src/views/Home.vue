@@ -9,14 +9,13 @@
                     </h1>
                     <p class="hero-subtitle">海量菜谱，智能推荐，让每一餐都精彩</p>
                     <div class="hero-search">
-                        <el-input v-model="keyword" placeholder="搜索你想要的菜谱..." size="large" @keyup.enter="handleSearch">
-                            <template #prefix>
-                                <el-icon>
-                                    <Search />
-                                </el-icon>
-                            </template>
-                        </el-input>
-                        <el-button type="primary" size="large" @click="handleSearch">搜索</el-button>
+                        <SearchEntry
+                            v-model="keyword"
+                            source-page="home"
+                            size="large"
+                            placeholder="搜索菜名、食材、作者..."
+                            @submit="handleSearchSubmit"
+                        />
                     </div>
                     <div class="hero-tags">
                         <span class="tag-label">热门搜索：</span>
@@ -99,9 +98,12 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Search, Dish, Bowl, Coffee, ArrowRight, KnifeFork, IceCream, Grid, DocumentAdd } from '@element-plus/icons-vue'
+import { Dish, Bowl, Coffee, ArrowRight, KnifeFork, IceCream, Grid, DocumentAdd } from '@element-plus/icons-vue'
 import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
+import SearchEntry from '@/components/SearchEntry.vue'
+import { trackBehavior } from '@/utils/tracker'
+import { SEARCH_HOT_KEYWORDS, addSearchHistory } from '@/utils/search'
 
 const router = useRouter()
 const keyword = ref('')
@@ -110,7 +112,7 @@ const recommendList = ref([])
 const hotList = ref([])
 const loading = ref(false)
 
-const hotTags = ['红烧肉', '可乐鸡翅', '糖醋排骨', '宫保鸡丁', '麻婆豆腐']
+const hotTags = SEARCH_HOT_KEYWORDS.slice(0, 5)
 
 const categoryIcons = [KnifeFork, Bowl, Coffee, IceCream, Dish, Grid, KnifeFork, Bowl]
 const categoryColors = [
@@ -127,17 +129,24 @@ const categoryColors = [
 const getCategoryIcon = (index) => categoryIcons[index % categoryIcons.length]
 const getCategoryColor = (index) => categoryColors[index % categoryColors.length]
 
-const handleSearch = () => {
-    if (keyword.value.trim()) {
-        router.push({ path: '/search', query: { keyword: keyword.value } })
-    }
+const handleSearchSubmit = ({ keyword: nextKeyword }) => {
+    router.push({ path: '/search', query: { keyword: nextKeyword } })
 }
 
 const searchTag = (tag) => {
+    addSearchHistory(tag)
+    trackBehavior('search_submit', {
+        sourcePage: 'home_hot_tag',
+        extra: { keyword: tag }
+    })
     router.push({ path: '/search', query: { keyword: tag } })
 }
 
 const goCategory = (cat) => {
+    trackBehavior('category_click', {
+        sourcePage: 'home',
+        extra: { categoryId: cat.id, categoryName: cat.name }
+    })
     router.push({ path: '/recipes', query: { category: cat.id } })
 }
 
@@ -176,6 +185,7 @@ const loadData = async () => {
 }
 
 onMounted(async () => {
+    trackBehavior('page_view', { sourcePage: 'home' })
     const cacheTime = sessionStorage.getItem('cacheTime')
     if (cacheTime && (Date.now() - parseInt(cacheTime)) < 3600000) {
         categories.value = JSON.parse(sessionStorage.getItem('categories'))
@@ -230,15 +240,8 @@ onMounted(async () => {
 }
 
 .hero-search {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
     max-width: 600px;
     margin: 0 auto 18px;
-}
-
-.hero-search .el-input {
-    flex: 1;
 }
 
 .hero-search :deep(.el-input__wrapper) {
@@ -247,7 +250,7 @@ onMounted(async () => {
     box-shadow: var(--shadow-md);
 }
 
-.hero-search .el-button {
+.hero-search :deep(.search-entry__button) {
     border-radius: 28px;
     padding: 0 28px;
     background: var(--accent-color);
@@ -256,7 +259,7 @@ onMounted(async () => {
     font-weight: 600;
 }
 
-.hero-search .el-button:hover {
+.hero-search :deep(.search-entry__button:hover) {
     background: #ffd93d;
     border-color: #ffd93d;
 }
@@ -464,11 +467,14 @@ onMounted(async () => {
     }
 
     .hero-search {
-        flex-direction: column;
         margin-bottom: 12px;
     }
 
-    .hero-search .el-button {
+    .hero-search :deep(.search-entry) {
+        flex-direction: column;
+    }
+
+    .hero-search :deep(.search-entry__button) {
         width: 100%;
         padding: 0 20px;
     }

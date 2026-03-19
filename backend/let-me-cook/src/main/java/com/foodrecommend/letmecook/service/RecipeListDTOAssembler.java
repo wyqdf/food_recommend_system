@@ -37,9 +37,12 @@ public class RecipeListDTOAssembler {
             RecipeListDTO dto = new RecipeListDTO();
             dto.setId(recipe.getId());
             dto.setName(recipe.getTitle());
+            dto.setAuthor(recipe.getAuthor());
+            dto.setAuthorUid(recipe.getAuthorUid());
             dto.setImage(recipe.getImage());
             dto.setDifficulty(recipe.getDifficultyName());
             dto.setTime(recipe.getTimeCostName());
+            dto.setTaste(recipe.getTasteName());
             dto.setLikeCount(recipe.getLikeCount());
             dto.setFavoriteCount(recipe.getRatingCount());
             dto.setReplyCount(recipe.getReplyCount());

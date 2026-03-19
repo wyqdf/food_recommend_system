@@ -22,13 +22,13 @@ public interface StatisticsMapper {
     @Select("SELECT COUNT(*) FROM comments")
     int countTotalComments();
 
-    @Select("SELECT COUNT(*) FROM interactions WHERE DATE(create_time) = CURDATE()")
+    @Select("SELECT COUNT(*) FROM interactions WHERE create_time >= CURDATE()")
     int countTodayViews();
 
-    @Select("SELECT COUNT(*) FROM users WHERE DATE(create_time) = CURDATE()")
+    @Select("SELECT COUNT(*) FROM users WHERE create_time >= CURDATE()")
     int countTodayNewUsers();
 
-    @Select("SELECT COUNT(*) FROM recipes WHERE DATE(create_time) = CURDATE()")
+    @Select("SELECT COUNT(*) FROM recipes WHERE create_time >= CURDATE()")
     int countTodayNewRecipes();
 
         @Select("<script>" +
@@ -92,11 +92,16 @@ public interface StatisticsMapper {
     List<Map<String, Object>> getTopRecipes(@Param("limit") int limit);
 
         @Select("<script>" +
-            "SELECT r.id, r.title, COUNT(c.id) as comment_count " +
-            "FROM recipes r " +
-            "LEFT JOIN comments c ON r.id = c.recipe_id " +
-            "GROUP BY r.id, r.title " +
-            "ORDER BY comment_count DESC " +
+            "SELECT r.id, r.title, c.comment_count " +
+            "FROM (" +
+            "  SELECT recipe_id, COUNT(*) AS comment_count " +
+            "  FROM comments " +
+            "  GROUP BY recipe_id " +
+            "  ORDER BY comment_count DESC " +
+            "  LIMIT #{limit}" +
+            ") c " +
+            "INNER JOIN recipes r ON r.id = c.recipe_id " +
+            "ORDER BY c.comment_count DESC, r.id DESC " +
             "LIMIT #{limit}" +
             "</script>")
     List<Map<String, Object>> getTopCommentedRecipes(@Param("limit") int limit);

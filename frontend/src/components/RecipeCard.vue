@@ -24,12 +24,16 @@
     </div>
     <div class="recipe-info">
       <h3 class="recipe-title">{{ recipe.title || recipe.name }}</h3>
+      <p v-if="recipe.reasons?.length" class="recommend-reason">{{ recipe.reasons[0] }}</p>
       <p class="recipe-author">
         <el-icon>
           <User />
         </el-icon>
         {{ recipe.author || '佚名' }}
       </p>
+      <div v-if="recipe.sceneTags?.length" class="scene-tags">
+        <span v-for="tag in recipe.sceneTags.slice(0, 2)" :key="tag" class="scene-tag">{{ tag }}</span>
+      </div>
       <div class="recipe-meta">
         <span class="meta-item">
           <el-icon>
@@ -55,17 +59,23 @@
 </template>
 
 <script setup>
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { Picture, Star, Timer, User, ChatDotRound, CollectionTag } from '@element-plus/icons-vue'
+import { trackBehavior } from '@/utils/tracker'
 
 const props = defineProps({
   recipe: { type: Object, required: true }
 })
 
 const router = useRouter()
+const route = useRoute()
 const defaultImage = '/images/food-placeholder.svg'
 
 const goDetail = () => {
+  trackBehavior('recipe_click', {
+    recipeId: props.recipe.id,
+    sourcePage: route.path
+  })
   router.push(`/recipe/${props.recipe.id}`)
 }
 
@@ -204,6 +214,30 @@ const getDifficultyClass = (difficulty) => {
   font-size: 13px;
   color: var(--text-regular);
   margin-bottom: 10px;
+}
+
+.recommend-reason {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--primary-color);
+  line-height: 1.4;
+}
+
+.scene-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.scene-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  color: #0f766e;
+  background: #ecfeff;
+  border: 1px solid #bbf7d0;
 }
 
 .recipe-meta {

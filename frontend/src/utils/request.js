@@ -3,7 +3,7 @@ import { ElMessage } from "element-plus";
 
 const request = axios.create({
   baseURL: "/api",
-  timeout: 10000,
+  timeout: 15000,
 });
 
 const publicApis = [
@@ -16,6 +16,8 @@ const publicApis = [
   '/ingredients',
   '/cookwares',
   '/search',
+  '/analytics',
+  '/scenes',
 ];
 
 const isPublicApi = (url) => {
@@ -55,7 +57,11 @@ request.interceptors.response.use(
   },
   (error) => {
     const url = error.config?.url || '';
+    const silentError = Boolean(error.config?.silentError);
     const errorMessage = error.response?.data?.message || error.message || "网络错误";
+    const resolvedMessage = error.code === 'ECONNABORTED'
+      ? "请求超时，请稍后重试"
+      : errorMessage;
     
     if (error.response?.status === 401) {
       const isAdminRoute = url.startsWith("/admin");
@@ -75,15 +81,15 @@ request.interceptors.response.use(
         
         if (!isPublicApi(url)) {
           if (window.location.pathname !== '/login') {
-            ElMessage.warning(errorMessage || "登录已过期，请重新登录");
+            ElMessage.warning(resolvedMessage || "登录已过期，请重新登录");
             setTimeout(() => {
               window.location.href = "/login";
             }, 500);
           }
         }
       }
-    } else {
-      ElMessage.error(errorMessage);
+    } else if (!silentError) {
+      ElMessage.error(resolvedMessage);
     }
     return Promise.reject(error);
   },

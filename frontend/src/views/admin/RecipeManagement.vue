@@ -273,7 +273,7 @@
         <el-divider content-position="left">分类</el-divider>
 
         <el-checkbox-group v-model="formData.categoryIds">
-          <el-checkbox v-for="cat in categories" :key="cat.id" :label="cat.id">
+          <el-checkbox v-for="cat in categories" :key="cat.id" :value="cat.id">
             {{ cat.name }}
           </el-checkbox>
         </el-checkbox-group>
@@ -468,6 +468,9 @@ const techniques = ref([])
 const timeCosts = ref([])
 const ingredients = ref([])
 const categories = ref([])
+const editorOptionsLoaded = ref(false)
+const editorOptionsLoading = ref(false)
+let editorOptionsPromise = null
 
 const getDifficultyType = (difficulty) => {
   const map = {
@@ -478,26 +481,53 @@ const getDifficultyType = (difficulty) => {
   return map[difficulty] || 'info'
 }
 
-const loadOptions = async () => {
+const loadFilterOptions = async () => {
   try {
-    const [diffRes, tasteRes, techRes, timeRes, ingRes, catRes] = await Promise.all([
+    const [diffRes, tasteRes] = await Promise.all([
       adminDifficultyApi.getList(),
-      adminTasteApi.getList(),
-      adminTechniqueApi.getList(),
-      adminTimeCostApi.getList(),
-      adminIngredientApi.getList(),
-      adminCategoryApi.getList()
+      adminTasteApi.getList()
     ])
 
     difficulties.value = diffRes.data || []
     tastes.value = tasteRes.data || []
-    techniques.value = techRes.data || []
-    timeCosts.value = timeRes.data || []
-    ingredients.value = ingRes.data || []
-    categories.value = catRes.data || []
   } catch (error) {
-    console.error('加载选项失败:', error)
+    console.error('加载筛选选项失败:', error)
   }
+}
+
+const ensureEditorOptionsLoaded = async () => {
+  if (editorOptionsLoaded.value) return
+  if (editorOptionsPromise) {
+    await editorOptionsPromise
+    return
+  }
+
+  editorOptionsPromise = (async () => {
+    editorOptionsLoading.value = true
+    try {
+      const [techRes, timeRes, ingRes, catRes] = await Promise.all([
+        adminTechniqueApi.getList(),
+        adminTimeCostApi.getList(),
+        adminIngredientApi.getList(),
+        adminCategoryApi.getList()
+      ])
+
+      techniques.value = techRes.data || []
+      timeCosts.value = timeRes.data || []
+      ingredients.value = ingRes.data || []
+      categories.value = catRes.data || []
+      editorOptionsLoaded.value = true
+    } catch (error) {
+      console.error('加载编辑选项失败:', error)
+      ElMessage.error('加载编辑选项失败')
+      throw error
+    } finally {
+      editorOptionsLoading.value = false
+      editorOptionsPromise = null
+    }
+  })()
+
+  await editorOptionsPromise
 }
 
 const loadData = async () => {
@@ -531,7 +561,8 @@ const handleReset = () => {
   loadData()
 }
 
-const handleCreate = () => {
+const handleCreate = async () => {
+  await ensureEditorOptionsLoaded()
   isEdit.value = false
   dialogTitle.value = '新增食谱'
   Object.keys(formData).forEach(key => {
@@ -547,6 +578,7 @@ const handleCreate = () => {
 }
 
 const handleEdit = async (row) => {
+  await ensureEditorOptionsLoaded()
   isEdit.value = true
   dialogTitle.value = '编辑食谱'
   try {
@@ -699,7 +731,10 @@ const handleSubmit = async () => {
     dialogVisible.value = false
     loadData()
   } catch (error) {
-    if (error !== 'cancel') {
+    const firstError = error && typeof error === 'object' ? Object.values(error)[0] : null
+    if (firstError && Array.isArray(firstError) && firstError[0]?.message) {
+      ElMessage.error(firstError[0].message)
+    } else if (error !== 'cancel') {
       console.error('提交失败:', error)
       ElMessage.error('操作失败')
     }
@@ -709,7 +744,7 @@ const handleSubmit = async () => {
 }
 
 onMounted(() => {
-  loadOptions()
+  loadFilterOptions()
   loadData()
 })
 </script>

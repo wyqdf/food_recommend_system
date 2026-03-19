@@ -12,7 +12,7 @@ public interface CommentMapper {
                         "FROM comments c " +
                         "LEFT JOIN users u ON c.user_id = u.id " +
                         "WHERE c.recipe_id = #{recipeId} " +
-                        "ORDER BY c.publish_time DESC " +
+                        "ORDER BY c.publish_time DESC, c.id DESC " +
                         "LIMIT #{offset}, #{pageSize}")
         List<Comment> findByRecipeId(@Param("recipeId") Integer recipeId,
                         @Param("offset") int offset,

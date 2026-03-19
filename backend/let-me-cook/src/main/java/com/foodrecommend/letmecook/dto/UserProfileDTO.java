@@ -13,4 +13,5 @@ public class UserProfileDTO {
     private LocalDateTime createTime;
     private Integer favoritesCount;
     private Integer commentsCount;
+    private Boolean onboardingCompleted;
 }

@@ -2,6 +2,7 @@ package com.foodrecommend.letmecook.config;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,6 +26,9 @@ public class DatabaseMigrationConfig {
 
     private final JdbcTemplate jdbcTemplate;
 
+    @Value("${database.migration.analyze-on-startup:false}")
+    private boolean analyzeOnStartup;
+
     @Bean
     public CommandLineRunner addPerformanceIndexes() {
         return args -> {
@@ -33,15 +37,46 @@ public class DatabaseMigrationConfig {
             addCookwaresTable();
             addRecipeCountColumns();
             enhanceOperationLogsTable();
+            addUserPreferenceProfilesTable();
+            addBehaviorEventsTable();
+            addCookingSessionsTable();
             
             log.info("开始执行数据库性能优化索引...");
+            addIndexIfNotExists("idx_comment_recipe_publish_time", "comments", "recipe_id, publish_time DESC, id DESC");
+            addIndexIfNotExists("idx_comment_create_time", "comments", "create_time DESC");
             addIndexIfNotExists("idx_comment_user_create", "comments", "user_id, create_time");
+            addIndexIfNotExists("idx_recipes_status_create_time", "recipes", "status, create_time DESC, id DESC");
+            addIndexIfNotExists("idx_recipes_status_like_count", "recipes", "status, like_count DESC, id DESC");
+            addIndexIfNotExists("idx_recipes_status_rating_count", "recipes", "status, rating_count DESC, id DESC");
+            addIndexIfNotExists("idx_recipes_admin_create_time", "recipes", "create_time DESC, id DESC");
             addIndexIfNotExists("idx_interaction_user_type", "interactions", "user_id, interaction_type");
-            addIndexIfNotExists("idx_user_status", "users", "status");
+            addIndexIfNotExists("idx_interactions_create_time_type", "interactions", "create_time DESC, interaction_type");
             addIndexIfNotExists("idx_user_create_time", "users", "create_time DESC");
-            
-            analyzeTables();
-            
+            addIndexIfNotExists("idx_users_status_create_time", "users", "status, create_time DESC, id DESC");
+            addIndexIfNotExists("idx_recipe_author_uid", "recipes", "author_uid");
+            addIndexIfNotExists("idx_behavior_user_time", "behavior_events", "user_id, create_time DESC, id DESC, recipe_id");
+            addIndexIfNotExists("idx_behavior_event_time", "behavior_events", "event_type, create_time DESC");
+            addIndexIfNotExists("idx_behavior_recipe_time", "behavior_events", "recipe_id, create_time DESC");
+            addIndexIfNotExists("idx_behavior_session_time", "behavior_events", "session_id, create_time DESC");
+            addIndexIfNotExists("idx_behavior_user_event_time_recipe", "behavior_events", "user_id, event_type, create_time DESC, id DESC, recipe_id");
+            addIndexIfNotExists("idx_behavior_user_time_scene", "behavior_events", "user_id, create_time DESC, scene_code");
+            addIndexIfNotExists("idx_cook_session_user_status_time", "cooking_sessions", "user_id, status, last_active_time DESC");
+            addIndexIfNotExists("idx_cook_session_recipe_time", "cooking_sessions", "recipe_id, started_at DESC");
+            addIndexIfNotExists("idx_cook_session_user_start_time", "cooking_sessions", "user_id, started_at DESC");
+            setIndexInvisibleIfExists("comments", "idx_comment_recipe");
+            setIndexInvisibleIfExists("recipes", "idx_createtime");
+            setIndexInvisibleIfExists("recipes", "idx_like_count");
+            setIndexInvisibleIfExists("users", "idx_users_status");
+            setIndexInvisibleIfExists("users", "idx_user_status");
+            setIndexInvisibleIfExists("recipe_categories", "idx_recipe_categories_recipe");
+            setIndexInvisibleIfExists("recipe_ingredients", "idx_ri");
+
+            if (analyzeOnStartup) {
+                analyzeTables();
+            } else {
+                log.info("跳过启动时 ANALYZE TABLE，可通过 database.migration.analyze-on-startup=true 开启");
+            }
+
             log.info("数据库迁移和性能优化执行完成");
         };
     }
@@ -196,6 +231,30 @@ public class DatabaseMigrationConfig {
         return count != null && count > 0;
     }
 
+    private void setIndexInvisibleIfExists(String tableName, String indexName) {
+        try {
+            if (!checkIndexExists(tableName, indexName)) {
+                log.info("索引不存在，跳过隐藏：{}.{}", tableName, indexName);
+                return;
+            }
+            if (!isIndexVisible(tableName, indexName)) {
+                log.info("索引已是 INVISIBLE：{}.{}", tableName, indexName);
+                return;
+            }
+            log.info("隐藏冗余索引：{}.{}", tableName, indexName);
+            jdbcTemplate.execute(String.format("ALTER TABLE %s ALTER INDEX %s INVISIBLE", tableName, indexName));
+            log.info("索引已隐藏：{}.{}", tableName, indexName);
+        } catch (Exception e) {
+            log.warn("隐藏索引 {}.{} 时出错：{}", tableName, indexName, e.getMessage());
+        }
+    }
+
+    private boolean isIndexVisible(String tableName, String indexName) throws SQLException {
+        String sql = "SELECT MAX(CASE WHEN IS_VISIBLE = 'YES' THEN 1 ELSE 0 END) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = 'food_recommend' AND TABLE_NAME = ? AND INDEX_NAME = ?";
+        Integer visible = jdbcTemplate.queryForObject(sql, Integer.class, tableName, indexName);
+        return visible != null && visible > 0;
+    }
+
     private void enhanceOperationLogsTable() {
         try {
             if (!checkTableExists("operation_logs")) {
@@ -227,12 +286,108 @@ public class DatabaseMigrationConfig {
         }
     }
 
+    private void addUserPreferenceProfilesTable() {
+        try {
+            if (checkTableExists("user_preference_profiles")) {
+                log.info("user_preference_profiles 表已存在，跳过创建");
+                return;
+            }
+            log.info("创建 user_preference_profiles 表...");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS user_preference_profiles (
+                        id INT PRIMARY KEY AUTO_INCREMENT,
+                        user_id INT NOT NULL UNIQUE,
+                        diet_goal VARCHAR(50),
+                        cooking_skill VARCHAR(50),
+                        time_budget VARCHAR(50),
+                        preferred_tastes_json JSON NULL,
+                        taboo_ingredients_json JSON NULL,
+                        available_cookwares_json JSON NULL,
+                        preferred_scenes_json JSON NULL,
+                        onboarding_completed TINYINT DEFAULT 0,
+                        create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_user_preference_user
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户偏好画像表'
+                    """);
+            log.info("user_preference_profiles 表创建完成");
+        } catch (Exception e) {
+            log.warn("创建 user_preference_profiles 表失败：{}", e.getMessage());
+        }
+    }
+
+    private void addBehaviorEventsTable() {
+        try {
+            if (checkTableExists("behavior_events")) {
+                log.info("behavior_events 表已存在，跳过创建");
+                return;
+            }
+            log.info("创建 behavior_events 表...");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS behavior_events (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        user_id INT NULL,
+                        session_id VARCHAR(64) NOT NULL,
+                        recipe_id INT NULL,
+                        event_type VARCHAR(64) NOT NULL,
+                        source_page VARCHAR(64) NULL,
+                        scene_code VARCHAR(32) NULL,
+                        step_number INT NULL,
+                        duration_ms INT NULL,
+                        extra_json JSON NULL,
+                        create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        CONSTRAINT fk_behavior_user
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+                        CONSTRAINT fk_behavior_recipe
+                            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行为埋点事件表'
+                    """);
+            log.info("behavior_events 表创建完成");
+        } catch (Exception e) {
+            log.warn("创建 behavior_events 表失败：{}", e.getMessage());
+        }
+    }
+
+    private void addCookingSessionsTable() {
+        try {
+            if (checkTableExists("cooking_sessions")) {
+                log.info("cooking_sessions 表已存在，跳过创建");
+                return;
+            }
+            log.info("创建 cooking_sessions 表...");
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS cooking_sessions (
+                        id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                        user_id INT NOT NULL,
+                        recipe_id INT NOT NULL,
+                        status VARCHAR(20) NOT NULL DEFAULT 'in_progress',
+                        current_step INT DEFAULT 1,
+                        total_steps INT DEFAULT 0,
+                        duration_ms INT DEFAULT 0,
+                        started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        last_active_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        finished_at DATETIME NULL,
+                        CONSTRAINT fk_cooking_session_user
+                            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                        CONSTRAINT fk_cooking_session_recipe
+                            FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户烹饪会话表'
+                    """);
+            log.info("cooking_sessions 表创建完成");
+        } catch (Exception e) {
+            log.warn("创建 cooking_sessions 表失败：{}", e.getMessage());
+        }
+    }
+
     private void analyzeTables() {
         try {
             log.info("分析表以更新统计信息...");
             jdbcTemplate.execute("ANALYZE TABLE users");
             jdbcTemplate.execute("ANALYZE TABLE comments");
             jdbcTemplate.execute("ANALYZE TABLE interactions");
+            jdbcTemplate.execute("ANALYZE TABLE behavior_events");
+            jdbcTemplate.execute("ANALYZE TABLE cooking_sessions");
             log.info("表分析完成");
         } catch (Exception e) {
             log.warn("分析表时出错：{}", e.getMessage());

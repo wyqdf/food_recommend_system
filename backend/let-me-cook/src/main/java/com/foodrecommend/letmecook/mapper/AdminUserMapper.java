@@ -5,14 +5,13 @@ import com.foodrecommend.letmecook.entity.User;
 import org.apache.ibatis.annotations.*;
 
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface AdminUserMapper {
 
         @Select("<script>" +
-                        "SELECT u.*, " +
-                        "COALESCE((SELECT COUNT(*) FROM interactions i WHERE i.user_id = u.id AND i.interaction_type = 'favorite'), 0) as favorites_count, " +
-                        "COALESCE((SELECT COUNT(*) FROM comments c WHERE c.user_id = u.id), 0) as comments_count " +
+                        "SELECT u.id " +
                         "FROM users u " +
                         "<where>" +
                         "<if test=\"keyword != null and keyword != ''\">" +
@@ -23,11 +22,46 @@ public interface AdminUserMapper {
                         "  AND u.status = #{status}" +
                         "</if>" +
                         "</where>" +
-                        "ORDER BY u.create_time DESC " +
+                        "ORDER BY u.create_time DESC, u.id DESC " +
                         "LIMIT #{offset}, #{pageSize}" +
                         "</script>")
-        List<UserDTO> findUsers(@Param("keyword") String keyword, @Param("status") Integer status,
+        List<Integer> findUserIds(@Param("keyword") String keyword, @Param("status") Integer status,
                         @Param("offset") int offset, @Param("pageSize") int pageSize);
+
+        @Select("<script>" +
+                        "SELECT " +
+                        "u.id, u.username, u.nickname, u.email, u.phone, u.status, u.avatar, " +
+                        "u.last_login_time AS lastLoginTime, u.create_time AS createTime " +
+                        "FROM users u " +
+                        "WHERE u.id IN " +
+                        "<foreach collection='ids' item='id' open='(' separator=',' close=')'>" +
+                        "#{id}" +
+                        "</foreach>" +
+                        "</script>")
+        List<UserDTO> findUsersByIds(@Param("ids") List<Integer> ids);
+
+        @Select("<script>" +
+                        "SELECT i.user_id AS userId, COUNT(*) AS total " +
+                        "FROM interactions i " +
+                        "WHERE i.interaction_type = 'favorite' " +
+                        "AND i.user_id IN " +
+                        "<foreach collection='ids' item='id' open='(' separator=',' close=')'>" +
+                        "#{id}" +
+                        "</foreach> " +
+                        "GROUP BY i.user_id" +
+                        "</script>")
+        List<Map<String, Object>> countFavoritesByUserIds(@Param("ids") List<Integer> ids);
+
+        @Select("<script>" +
+                        "SELECT c.user_id AS userId, COUNT(*) AS total " +
+                        "FROM comments c " +
+                        "WHERE c.user_id IN " +
+                        "<foreach collection='ids' item='id' open='(' separator=',' close=')'>" +
+                        "#{id}" +
+                        "</foreach> " +
+                        "GROUP BY c.user_id" +
+                        "</script>")
+        List<Map<String, Object>> countCommentsByUserIds(@Param("ids") List<Integer> ids);
 
         @Select("<script>" +
                         "SELECT COUNT(*) FROM users u " +

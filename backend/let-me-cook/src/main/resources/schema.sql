@@ -65,10 +65,30 @@ CREATE TABLE IF NOT EXISTS users (
     password VARCHAR(255),
     nickname VARCHAR(100),
     email VARCHAR(100),
+    phone VARCHAR(20),
+    status TINYINT DEFAULT 1 COMMENT '状态：1-正常 0-禁用',
     avatar VARCHAR(255),
+    last_login_time DATETIME,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uk_old_id (old_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- 用户冷启动画像表
+CREATE TABLE IF NOT EXISTS user_preference_profiles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL UNIQUE,
+    diet_goal VARCHAR(50) COMMENT '饮食目标',
+    cooking_skill VARCHAR(50) COMMENT '烹饪水平',
+    time_budget VARCHAR(50) COMMENT '可投入烹饪时长',
+    preferred_tastes_json JSON COMMENT '口味偏好',
+    taboo_ingredients_json JSON COMMENT '忌口/过敏',
+    available_cookwares_json JSON COMMENT '可用厨具',
+    preferred_scenes_json JSON COMMENT '场景偏好',
+    onboarding_completed TINYINT DEFAULT 0 COMMENT '冷启动问卷是否完成',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户偏好画像表';
 
 -- 菜谱表
 CREATE TABLE IF NOT EXISTS recipes (
@@ -87,6 +107,7 @@ CREATE TABLE IF NOT EXISTS recipes (
     difficulty_id INT COMMENT '难度ID',
     reply_count INT DEFAULT 0,
     like_count INT DEFAULT 0,
+    favorite_count INT DEFAULT 0,
     rating_count INT DEFAULT 0,
     status TINYINT DEFAULT 1 COMMENT '状态：1-正常 0-禁用',
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -95,7 +116,8 @@ CREATE TABLE IF NOT EXISTS recipes (
     FOREIGN KEY (technique_id) REFERENCES techniques(id),
     FOREIGN KEY (time_cost_id) REFERENCES time_costs(id),
     FOREIGN KEY (difficulty_id) REFERENCES difficulties(id),
-    UNIQUE KEY uk_old_id (old_id)
+    UNIQUE KEY uk_old_id (old_id),
+    KEY idx_recipe_author_uid (author_uid)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='菜谱表';
 
 -- 菜谱-分类关联表
@@ -158,6 +180,39 @@ CREATE TABLE IF NOT EXISTS interactions (
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户互动表';
 
+-- 行为埋点事件表
+CREATE TABLE IF NOT EXISTS behavior_events (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NULL,
+    session_id VARCHAR(64) NOT NULL,
+    recipe_id INT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    source_page VARCHAR(64) NULL,
+    scene_code VARCHAR(32) NULL,
+    step_number INT NULL,
+    duration_ms INT NULL,
+    extra_json JSON NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='行为埋点事件表';
+
+-- 烹饪会话表
+CREATE TABLE IF NOT EXISTS cooking_sessions (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    recipe_id INT NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'in_progress' COMMENT 'in_progress/completed',
+    current_step INT DEFAULT 1,
+    total_steps INT DEFAULT 0,
+    duration_ms INT DEFAULT 0 COMMENT '累计停留时长',
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_active_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    finished_at DATETIME NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户烹饪会话表';
+
 -- ===================== ID映射表 =====================
 
 -- 用户ID映射表
@@ -184,10 +239,31 @@ CREATE INDEX idx_recipe_technique ON recipes(technique_id);
 CREATE INDEX idx_recipe_difficulty ON recipes(difficulty_id);
 CREATE INDEX idx_recipe_like_count ON recipes(like_count DESC);
 CREATE INDEX idx_recipe_create_time ON recipes(create_time DESC);
+CREATE INDEX idx_recipes_status_create_time ON recipes(status, create_time DESC, id DESC);
+CREATE INDEX idx_recipes_status_like_count ON recipes(status, like_count DESC, id DESC);
+CREATE INDEX idx_recipes_status_rating_count ON recipes(status, rating_count DESC, id DESC);
+CREATE INDEX idx_recipes_admin_create_time ON recipes(create_time DESC, id DESC);
 CREATE INDEX idx_comment_recipe ON comments(recipe_id);
+CREATE INDEX idx_comment_recipe_publish_time ON comments(recipe_id, publish_time DESC, id DESC);
+CREATE INDEX idx_comment_create_time ON comments(create_time DESC);
 CREATE INDEX idx_comment_user ON comments(user_id);
+CREATE INDEX idx_comment_user_create ON comments(user_id, create_time);
 CREATE INDEX idx_interaction_user ON interactions(user_id);
 CREATE INDEX idx_interaction_recipe ON interactions(recipe_id);
+CREATE INDEX idx_interaction_user_type ON interactions(user_id, interaction_type);
+CREATE INDEX idx_interactions_create_time_type ON interactions(create_time DESC, interaction_type);
+CREATE INDEX idx_user_create_time ON users(create_time DESC);
+CREATE INDEX idx_users_status_create_time ON users(status, create_time DESC, id DESC);
+CREATE INDEX idx_user_pref_user ON user_preference_profiles(user_id);
+CREATE INDEX idx_behavior_user_time ON behavior_events(user_id, create_time DESC, id DESC, recipe_id);
+CREATE INDEX idx_behavior_session_time ON behavior_events(session_id, create_time DESC);
+CREATE INDEX idx_behavior_event_time ON behavior_events(event_type, create_time DESC);
+CREATE INDEX idx_behavior_recipe_time ON behavior_events(recipe_id, create_time DESC);
+CREATE INDEX idx_behavior_user_event_time_recipe ON behavior_events(user_id, event_type, create_time DESC, id DESC, recipe_id);
+CREATE INDEX idx_behavior_user_time_scene ON behavior_events(user_id, create_time DESC, scene_code);
+CREATE INDEX idx_cook_session_user_status_time ON cooking_sessions(user_id, status, last_active_time DESC);
+CREATE INDEX idx_cook_session_recipe_time ON cooking_sessions(recipe_id, started_at DESC);
+CREATE INDEX idx_cook_session_user_start_time ON cooking_sessions(user_id, started_at DESC);
 
 -- 菜谱 - 分类关联表索引（优化菜谱大全查询）
 CREATE INDEX idx_recipe_categories_composite ON recipe_categories(category_id, recipe_id);

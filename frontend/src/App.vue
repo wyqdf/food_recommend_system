@@ -53,15 +53,12 @@
           </el-menu>
           <div class="header-right">
             <div class="search-wrapper">
-              <el-input v-model="searchKeyword" placeholder="搜索菜谱..." class="search-input" @keyup.enter="handleSearch"
-                clearable>
-                <template #prefix>
-                  <el-icon>
-                    <Search />
-                  </el-icon>
-                </template>
-              </el-input>
-              <el-button type="primary" class="search-btn" @click="handleSearch">搜索</el-button>
+              <SearchEntry
+                v-model="searchKeyword"
+                source-page="header"
+                placeholder="搜索菜名、食材、作者..."
+                @submit="handleSearchSubmit"
+              />
             </div>
             <template v-if="userStore.isLoggedIn">
               <el-dropdown trigger="click">
@@ -70,7 +67,12 @@
                   <span class="user-name">{{ userStore.user?.username || '用户' }}</span>
                 </div>
                 <template #dropdown>
-                  <el-dropdown-menu>
+                    <el-dropdown-menu>
+                    <el-dropdown-item @click="openOnboarding">
+                      <el-icon>
+                        <EditPen />
+                      </el-icon>偏好问卷
+                    </el-dropdown-item>
                     <el-dropdown-item @click="$router.push('/user')">
                       <el-icon>
                         <User />
@@ -139,14 +141,12 @@
         </div>
 
         <div class="mobile-search">
-          <el-input v-model="searchKeyword" placeholder="搜索菜谱..." clearable @keyup.enter="handleSearch">
-            <template #prefix>
-              <el-icon>
-                <Search />
-              </el-icon>
-            </template>
-          </el-input>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
+          <SearchEntry
+            v-model="searchKeyword"
+            source-page="header"
+            placeholder="搜索菜名、食材、作者..."
+            @submit="handleSearchSubmit"
+          />
         </div>
 
         <el-menu class="mobile-nav-menu" :default-active="activeMobileNav" @select="handleMobileMenuSelect">
@@ -206,20 +206,25 @@
         </div>
       </div>
     </el-drawer>
+
+    <OnboardingSurveyDialog v-model="showOnboardingDialog" @completed="handleOnboardingCompleted" />
   </template>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Food, HomeFilled, Dish, Star, User, CollectionTag, SwitchButton, Setting, Menu, EditPen } from '@element-plus/icons-vue'
+import { Food, HomeFilled, Dish, Star, User, CollectionTag, SwitchButton, Setting, Menu, EditPen } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
+import OnboardingSurveyDialog from '@/components/OnboardingSurveyDialog.vue'
+import SearchEntry from '@/components/SearchEntry.vue'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const searchKeyword = ref('')
 const mobileMenuVisible = ref(false)
+const showOnboardingDialog = ref(false)
 
 const isAdminPage = computed(() => {
   return route.path.startsWith('/admin')
@@ -237,11 +242,15 @@ watch(() => route.fullPath, () => {
   mobileMenuVisible.value = false
 })
 
-const handleSearch = () => {
-  if (searchKeyword.value.trim()) {
-    mobileMenuVisible.value = false
-    router.push({ path: '/search', query: { keyword: searchKeyword.value } })
+watch(() => [route.path, route.query.keyword], ([path, value]) => {
+  if (path === '/search') {
+    searchKeyword.value = typeof value === 'string' ? value.trim() : ''
   }
+}, { immediate: true })
+
+const handleSearchSubmit = ({ keyword }) => {
+  mobileMenuVisible.value = false
+  router.push({ path: '/search', query: { keyword } })
 }
 
 const goTo = (path) => {
@@ -253,11 +262,38 @@ const handleMobileMenuSelect = (index) => {
   goTo(index)
 }
 
+const openOnboarding = () => {
+  showOnboardingDialog.value = true
+}
+
+const handleOnboardingCompleted = async () => {
+  await userStore.fetchProfile()
+}
+
 const handleLogout = () => {
   userStore.logout()
+  showOnboardingDialog.value = false
   mobileMenuVisible.value = false
   router.push('/')
 }
+
+onMounted(async () => {
+  if (!userStore.token) return
+  await userStore.fetchProfile()
+  if (userStore.user && userStore.user.onboardingCompleted === false) {
+    showOnboardingDialog.value = true
+  }
+})
+
+watch(() => userStore.user, (user) => {
+  if (!userStore.isLoggedIn) {
+    showOnboardingDialog.value = false
+    return
+  }
+  if (user && user.onboardingCompleted === false) {
+    showOnboardingDialog.value = true
+  }
+})
 </script>
 
 <style scoped>
@@ -352,21 +388,15 @@ const handleLogout = () => {
 }
 
 .search-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  width: min(420px, 36vw);
 }
 
-.search-input {
-  width: 210px;
-}
-
-.search-input :deep(.el-input__wrapper) {
+.search-wrapper :deep(.el-input__wrapper) {
   border-radius: 20px;
   padding: 0 15px;
 }
 
-.search-btn {
+.search-wrapper :deep(.search-entry__button) {
   border-radius: 20px;
   padding: 8px 18px;
 }
@@ -497,14 +527,6 @@ const handleLogout = () => {
   margin-bottom: 14px;
 }
 
-.mobile-search .el-input {
-  flex: 1;
-}
-
-.mobile-search .el-button {
-  min-width: 72px;
-}
-
 .mobile-nav-menu {
   border-right: none;
   margin: 6px 0 12px;
@@ -561,8 +583,8 @@ const handleLogout = () => {
     margin-left: 10px;
   }
 
-  .search-input {
-    width: 180px;
+  .search-wrapper {
+    width: min(360px, 34vw);
   }
 
   .logo-text {
@@ -631,11 +653,14 @@ const handleLogout = () => {
   }
 
   .mobile-search {
-    flex-direction: column;
     gap: 10px;
   }
 
-  .mobile-search .el-button {
+  .mobile-search :deep(.search-entry) {
+    flex-direction: column;
+  }
+
+  .mobile-search :deep(.search-entry__button) {
     width: 100%;
   }
 

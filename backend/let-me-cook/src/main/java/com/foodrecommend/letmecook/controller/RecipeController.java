@@ -47,27 +47,37 @@ public class RecipeController {
 
     @GetMapping("/search")
     public Result<Map<String, Object>> searchRecipes(
-            @RequestParam String keyword,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "relevance") String sort,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "10") int pageSize) {
+            @RequestParam(defaultValue = "12") int pageSize) {
 
-        PageResult<RecipeListDTO> result = recipeService.searchRecipes(keyword, page, pageSize);
+        PageResult<RecipeListDTO> result = recipeService.searchRecipes(keyword, sort, page, pageSize);
+        return Result.success(ResponseDataBuilder.page(result));
+    }
 
-        Map<String, Object> data = new HashMap<>();
-        data.put("list", result.getList());
-        data.put("total", result.getTotal());
-
-        return Result.success(data);
+    @GetMapping("/search/suggestions")
+    public Result<List<SearchSuggestionDTO>> getSearchSuggestions(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "8") int limit) {
+        return Result.success(recipeService.getSearchSuggestions(keyword, limit));
     }
 
     @GetMapping("/recommend")
     public Result<RecommendResponse> getRecommendations(
             @RequestParam(defaultValue = "personal") String type,
             @RequestParam(defaultValue = "16") int limit,
+            @RequestParam(required = false) String scene,
+            @RequestParam(required = false) Integer categoryId,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
 
-        Integer userId = authTokenHelper.optionalUserId(authorization);
-        RecommendResponse response = recipeService.getRecommendationsByType(type, limit, userId);
+        Integer userId = null;
+        try {
+            userId = authTokenHelper.optionalUserId(authorization);
+        } catch (Exception ignored) {
+            userId = null;
+        }
+        RecommendResponse response = recipeService.getRecommendationsByType(type, limit, userId, scene, categoryId);
         return Result.success(response);
     }
 

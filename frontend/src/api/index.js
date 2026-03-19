@@ -12,8 +12,16 @@ export const recipeApi = {
     return request.get(`/recipes/${id}`);
   },
 
-  search(params) {
-    return request.get("/recipes/search", { params });
+  search(params, config = {}) {
+    return request.get("/recipes/search", { params, ...config });
+  },
+
+  getSearchSuggestions(params) {
+    return request.get("/recipes/search/suggestions", {
+      params,
+      timeout: 10000,
+      silentError: true,
+    });
   },
 
   async getCategories() {
@@ -28,11 +36,11 @@ export const recipeApi = {
   },
 
   getRecommend(params) {
-    return request.get("/recipes/recommend", { params });
+    return request.get("/recipes/recommend", { params, timeout: 20000, silentError: true });
   },
 
   getSimilar(id, params) {
-    return request.get(`/recipes/${id}/similar`, { params });
+    return request.get(`/recipes/${id}/similar`, { params, timeout: 20000, silentError: true });
   },
 
   create(data) {
@@ -55,6 +63,18 @@ export const userApi = {
 
   updateProfile(data) {
     return request.put("/users/profile", data);
+  },
+
+  getOnboarding() {
+    return request.get("/users/onboarding");
+  },
+
+  updateOnboarding(data) {
+    return request.put("/users/onboarding", data);
+  },
+
+  get7dReport() {
+    return request.get("/users/reports/7d");
   },
 };
 
@@ -113,6 +133,32 @@ export const attributeApi = {
 
   getCookwares() {
     return request.get("/cookwares");
+  },
+};
+
+export const sceneApi = {
+  getList() {
+    return request.get("/scenes");
+  },
+};
+
+export const analyticsApi = {
+  batchEvents(data) {
+    return request.post("/analytics/events/batch", data);
+  },
+};
+
+export const cookingApi = {
+  startSession(recipeId) {
+    return request.post("/users/cooking-sessions/start", { recipeId });
+  },
+
+  updateProgress(sessionId, data) {
+    return request.put(`/users/cooking-sessions/${sessionId}/progress`, data);
+  },
+
+  finishSession(sessionId, data = {}) {
+    return request.post(`/users/cooking-sessions/${sessionId}/finish`, data);
   },
 };
 

@@ -6,9 +6,11 @@
 - Ports opened in firewall/security group:
   - `3000` (frontend)
   - `8081` (backend API)
+  - `9200` (optional, only if you want to debug Elasticsearch from outside the server)
 - MySQL (`3306`) is bound to `127.0.0.1` by default for security
   - For external DB access, edit `docker-compose.server.yml` and change
     `127.0.0.1:${MYSQL_PORT:-3306}:3306` to `${MYSQL_PORT:-3306}:3306`
+- Elasticsearch (`9200`) is also bound to `127.0.0.1` by default in server compose for security
 
 ## 2. Install Docker (Ubuntu 24.04)
 
@@ -35,6 +37,11 @@ Edit `.env.server` and set real values:
 - `ALIYUN_OSS_ACCESS_KEY_ID`
 - `ALIYUN_OSS_ACCESS_KEY_SECRET`
 - keep `ALIYUN_OSS_ENABLED=true`
+- keep `SEARCH_ENGINE=mysql` for the first deployment
+- verify `SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200`
+- keep `SEARCH_ES_INDEX_ALIAS=recipes_search`
+- keep `SEARCH_ES_INDEX_NAME=recipes_search_v2`
+- note: the compose file builds a custom Elasticsearch image with the official `analysis-smartcn` plugin
 
 ## 4. Deploy
 
@@ -50,13 +57,42 @@ bash deploy-server.sh
 - build and start all containers
 - run HTTP health checks for frontend and backend
 
+The compose stack now includes:
+
+- `frontend`
+- `backend`
+- `mysql`
+- `elasticsearch`
+
+Elasticsearch is built from the repo Dockerfile and includes:
+
+- official `analysis-smartcn` plugin
+- persistent data volume `elasticsearch_data`
+
 ## 5. Verify
 
 ```bash
 docker compose --env-file .env.server -f docker-compose.server.yml ps
 curl -I http://127.0.0.1:3000
 curl -I http://127.0.0.1:8081/api/categories
+curl -I http://127.0.0.1:9200
 ```
+
+Then complete the first Elasticsearch rollout:
+
+1. Log in to the admin dashboard.
+2. Open the new `搜索索引` card on Dashboard.
+3. Trigger one full rebuild and wait until status finishes.
+4. Confirm `failed=0` and there is no `lastError`.
+5. Confirm `targetIndex=recipes_search_v2` and `phase=completed`.
+6. Change `.env.server` `SEARCH_ENGINE` from `mysql` to `elasticsearch`.
+7. Restart backend:
+
+```bash
+docker compose --env-file .env.server -f docker-compose.server.yml restart backend
+```
+
+This switch strategy keeps MySQL as the primary source of truth while allowing Elasticsearch to take over query serving only after the first full index is ready.
 
 ## 6. First-Start DB Init and Persistence
 
@@ -88,6 +124,10 @@ docker compose --env-file .env.server -f docker-compose.server.yml restart
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f backend
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f frontend
 docker compose --env-file .env.server -f docker-compose.server.yml logs -f mysql
+docker compose --env-file .env.server -f docker-compose.server.yml logs -f elasticsearch
+
+# check smartcn plugin
+curl http://127.0.0.1:9200/_cat/plugins?v
 
 # stop
 docker compose --env-file .env.server -f docker-compose.server.yml down

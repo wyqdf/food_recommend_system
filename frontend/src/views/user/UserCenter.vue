@@ -25,6 +25,12 @@
               </el-icon>
               <span>我的收藏</span>
             </el-menu-item>
+            <el-menu-item index="/user/report">
+              <el-icon>
+                <DataAnalysis />
+              </el-icon>
+              <span>7日报告</span>
+            </el-menu-item>
           </el-menu>
         </el-card>
       </el-col>
@@ -63,7 +69,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { User, Star } from '@element-plus/icons-vue'
+import { User, Star, DataAnalysis } from '@element-plus/icons-vue'
 import { useUserStore } from '@/stores/user'
 import { userApi } from '@/api'
 

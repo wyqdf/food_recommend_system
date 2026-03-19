@@ -144,6 +144,18 @@ export const adminStatisticsApi = {
   },
 };
 
+export const adminSearchApi = {
+  getIndexStatus() {
+    return request.get("/admin/search/index/status");
+  },
+
+  rebuildIndex() {
+    return request.post("/admin/search/index/rebuild", null, {
+      timeout: 45000,
+    });
+  },
+};
+
 export const adminLogApi = {
   getList(params) {
     return request.get("/admin/logs", { params });

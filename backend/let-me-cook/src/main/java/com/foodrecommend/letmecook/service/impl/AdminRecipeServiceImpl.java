@@ -5,15 +5,19 @@ import com.foodrecommend.letmecook.dto.admin.*;
 import com.foodrecommend.letmecook.entity.*;
 import com.foodrecommend.letmecook.mapper.*;
 import com.foodrecommend.letmecook.service.AdminRecipeService;
+import com.foodrecommend.letmecook.search.RecipeSearchSyncEvent;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.Arrays;
@@ -31,6 +35,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
     private final TimeCostMapper timeCostMapper;
     private final DifficultyMapper difficultyMapper;
     private final IngredientMapper ingredientMapper;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
     public PageResult<RecipeDTO> getRecipes(int page, int pageSize, String keyword,
@@ -41,12 +46,34 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         int safePageSize = Math.min(Math.max(pageSize, 1), 200);
         int offset = (safePage - 1) * safePageSize;
 
-        List<Recipe> recipes = recipeMapper.findForAdmin(keyword, categoryId, tasteId,
-                techniqueId, timeCostId, difficultyId, status, startTime, endTime, offset, safePageSize);
         long total = recipeMapper.countForAdmin(keyword, categoryId, tasteId,
                 techniqueId, timeCostId, difficultyId, status, startTime, endTime);
-        
-        List<RecipeDTO> list = recipes.stream().map(this::convertToDTO).collect(Collectors.toList());
+        if (total <= 0) {
+            return new PageResult<>(List.of(), 0, safePage, safePageSize);
+        }
+
+        List<Integer> recipeIds = recipeMapper.findAdminRecipeIds(keyword, categoryId, tasteId,
+                techniqueId, timeCostId, difficultyId, status, startTime, endTime, offset, safePageSize);
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return new PageResult<>(List.of(), total, safePage, safePageSize);
+        }
+
+        List<Recipe> recipes = recipeMapper.findAdminByIds(recipeIds);
+        Map<Integer, Recipe> recipeMap = new LinkedHashMap<>();
+        for (Recipe recipe : recipes) {
+            if (recipe != null && recipe.getId() != null) {
+                recipeMap.put(recipe.getId(), recipe);
+            }
+        }
+
+        List<RecipeDTO> list = new ArrayList<>(recipeIds.size());
+        for (Integer recipeId : recipeIds) {
+            Recipe recipe = recipeMap.get(recipeId);
+            if (recipe != null) {
+                list.add(convertToDTO(recipe));
+            }
+        }
+
         return new PageResult<>(list, total, safePage, safePageSize);
     }
 
@@ -112,6 +139,8 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
                 categoryMapper.insertRecipeCategory(recipe.getId(), categoryId);
             }
         }
+
+        publishSearchUpsert(recipe.getId());
         
         return convertToDTO(recipe);
     }
@@ -171,6 +200,8 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
                 categoryMapper.insertRecipeCategory(id, categoryId);
             }
         }
+
+        publishSearchUpsert(id);
     }
 
     @Override
@@ -185,6 +216,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         cookingStepMapper.deleteByRecipeId(id);
         categoryMapper.deleteRecipeCategoriesByRecipeId(id);
         recipeMapper.deleteById(id);
+        publishSearchDelete(List.of(id));
     }
 
     @Override
@@ -211,6 +243,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
     }
 
     @Override
+    @Transactional
     public void auditRecipe(Integer id, AuditRequest request) {
         Recipe recipe = recipeMapper.findById(id);
         if (recipe == null) {
@@ -218,6 +251,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         }
         
         recipeMapper.updateStatus(id, request.getStatus());
+        publishSearchUpsert(id);
     }
 
     private RecipeDTO convertToDTO(Recipe recipe) {
@@ -382,5 +416,19 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
                         .filter(id -> id != null && id > 0)
                         .collect(Collectors.toList())
         ));
+    }
+
+    private void publishSearchUpsert(Integer recipeId) {
+        if (recipeId == null || recipeId <= 0) {
+            return;
+        }
+        applicationEventPublisher.publishEvent(RecipeSearchSyncEvent.upsert(List.of(recipeId)));
+    }
+
+    private void publishSearchDelete(List<Integer> recipeIds) {
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return;
+        }
+        applicationEventPublisher.publishEvent(RecipeSearchSyncEvent.delete(recipeIds));
     }
 }

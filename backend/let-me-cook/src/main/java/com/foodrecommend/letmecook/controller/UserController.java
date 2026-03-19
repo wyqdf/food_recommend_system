@@ -64,4 +64,29 @@ public class UserController {
             return Result.error(401, "登录已过期，请重新登录");
         }
     }
+
+    @GetMapping("/onboarding")
+    public Result<OnboardingProfileDTO> getOnboardingProfile(
+            @RequestHeader("Authorization") String authorization) {
+        try {
+            Integer userId = authTokenHelper.requireUserId(authorization);
+            OnboardingProfileDTO profile = userService.getOnboardingProfile(userId);
+            return Result.success(profile);
+        } catch (Exception e) {
+            return Result.error(401, "登录已过期，请重新登录");
+        }
+    }
+
+    @PutMapping("/onboarding")
+    public Result<Object> updateOnboardingProfile(
+            @RequestHeader("Authorization") String authorization,
+            @RequestBody UpdateOnboardingRequest request) {
+        try {
+            Integer userId = authTokenHelper.requireUserId(authorization);
+            userService.updateOnboardingProfile(userId, request);
+            return Result.success(null, "问卷保存成功");
+        } catch (Exception e) {
+            return Result.error(401, "登录已过期，请重新登录");
+        }
+    }
 }

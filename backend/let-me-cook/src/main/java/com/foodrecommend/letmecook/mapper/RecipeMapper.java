@@ -9,78 +9,84 @@ import java.util.List;
 public interface RecipeMapper {
 
         @Select("<script>" +
-                        "SELECT DISTINCT r.*, d.name as difficultyName, t.name as timeCostName " +
+                        "SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "<if test='category != null'>" +
                         "INNER JOIN recipe_categories rc ON r.id = rc.recipe_id AND rc.category_id = #{category} " +
                         "</if>" +
                         "WHERE r.status = 1 " +
-                        "<if test='difficulty != null'>" +
-                        "AND d.name = #{difficulty} " +
+                        "<if test='difficultyId != null'>" +
+                        "AND r.difficulty_id = #{difficultyId} " +
                         "</if>" +
-                        "<if test='time != null'>" +
-                        "AND t.name = #{time} " +
+                        "<if test='timeCostId != null'>" +
+                        "AND r.time_cost_id = #{timeCostId} " +
                         "</if>" +
                         "<choose>" +
                         "<when test='sort == \"hot\"'>" +
-                        "ORDER BY r.like_count DESC" +
+                        "ORDER BY r.like_count DESC, r.id DESC" +
                         "</when>" +
                         "<when test='sort == \"collect\"'>" +
-                        "ORDER BY r.rating_count DESC" +
+                        "ORDER BY r.rating_count DESC, r.id DESC" +
                         "</when>" +
                         "<otherwise>" +
-                        "ORDER BY r.create_time DESC" +
+                        "ORDER BY r.create_time DESC, r.id DESC" +
                         "</otherwise>" +
                         "</choose>" +
                         " LIMIT #{offset}, #{pageSize}" +
                         "</script>")
         List<Recipe> findByCondition(@Param("category") Integer category,
-                        @Param("difficulty") String difficulty,
-                        @Param("time") String time,
+                        @Param("difficultyId") Integer difficultyId,
+                        @Param("timeCostId") Integer timeCostId,
                         @Param("sort") String sort,
                         @Param("offset") int offset,
                         @Param("pageSize") int pageSize);
 
         @Select("<script>" +
-                        "SELECT COUNT(DISTINCT r.id) FROM recipes r " +
-                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "SELECT COUNT(*) FROM recipes r " +
                         "<if test='category != null'>" +
                         "INNER JOIN recipe_categories rc ON r.id = rc.recipe_id AND rc.category_id = #{category} " +
                         "</if>" +
                         "WHERE r.status = 1 " +
-                        "<if test='difficulty != null'>" +
-                        "AND d.name = #{difficulty} " +
+                        "<if test='difficultyId != null'>" +
+                        "AND r.difficulty_id = #{difficultyId} " +
                         "</if>" +
-                        "<if test='time != null'>" +
-                        "AND t.name = #{time} " +
+                        "<if test='timeCostId != null'>" +
+                        "AND r.time_cost_id = #{timeCostId} " +
                         "</if>" +
                         "</script>")
         long countByCondition(@Param("category") Integer category,
-                        @Param("difficulty") String difficulty,
-                        @Param("time") String time);
+                        @Param("difficultyId") Integer difficultyId,
+                        @Param("timeCostId") Integer timeCostId);
 
-        @Select("SELECT r.*, d.name as difficultyName, t.name as timeCostName " +
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "WHERE r.id = #{id}")
         Recipe findById(Integer id);
 
-        @Select("SELECT r.*, d.name as difficultyName, t.name as timeCostName " +
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "WHERE r.id = #{id} AND r.status = 1")
         Recipe findPublicById(Integer id);
 
         @Select("<script>" +
-                        "SELECT r.*, d.name as difficultyName, t.name as timeCostName " +
+                        "SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "WHERE r.status = 1 AND r.id IN " +
                         "<foreach item='id' collection='ids' open='(' separator=',' close=')'>" +
                         "#{id}" +
@@ -88,49 +94,218 @@ public interface RecipeMapper {
                         "</script>")
         List<Recipe> findByIds(@Param("ids") List<Integer> ids);
 
-        @Select("<script>" +
-                        "SELECT r.*, d.name as difficultyName, t.name as timeCostName " +
+        @Select("SELECT COUNT(*) FROM recipes WHERE status = 1")
+        long countPublicRecipes();
+
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
-                        "WHERE r.status = 1 AND r.title LIKE CONCAT('%', #{keyword}, '%') " +
-                        "ORDER BY r.create_time DESC " +
-                        "LIMIT #{offset}, #{pageSize}" +
-                        "</script>")
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
+                        "WHERE r.status = 1 " +
+                        "ORDER BY r.id ASC " +
+                        "LIMIT #{offset}, #{pageSize}")
+        List<Recipe> findPublicForSearchBatch(@Param("offset") int offset, @Param("pageSize") int pageSize);
+
+        @Select({
+                        "<script>",
+                        "SELECT r.*,",
+                        "d.name as difficultyName,",
+                        "tc.name as timeCostName,",
+                        "ta.name as tasteName,",
+                        "tech.name as techniqueName,",
+                        "(",
+                        "  CASE",
+                        "    WHEN r.title = #{keyword} THEN 120",
+                        "    WHEN r.title LIKE CONCAT(#{keyword}, '%') THEN 100",
+                        "    WHEN r.title LIKE CONCAT('%', #{keyword}, '%') THEN 80",
+                        "    ELSE 0",
+                        "  END",
+                        "  + CASE WHEN COALESCE(r.author, '') LIKE CONCAT('%', #{keyword}, '%') THEN 30 ELSE 0 END",
+                        "  + CASE WHEN COALESCE(ta.name, '') LIKE CONCAT('%', #{keyword}, '%') THEN 18 ELSE 0 END",
+                        "  + CASE WHEN COALESCE(tech.name, '') LIKE CONCAT('%', #{keyword}, '%') THEN 15 ELSE 0 END",
+                        "  + CASE WHEN COALESCE(tc.name, '') LIKE CONCAT('%', #{keyword}, '%') THEN 12 ELSE 0 END",
+                        "  + CASE WHEN COALESCE(d.name, '') LIKE CONCAT('%', #{keyword}, '%') THEN 12 ELSE 0 END",
+                        "  + CASE WHEN EXISTS (",
+                        "      SELECT 1 FROM recipe_categories rc",
+                        "      INNER JOIN categories c ON c.id = rc.category_id",
+                        "      WHERE rc.recipe_id = r.id AND c.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    ) THEN 24 ELSE 0 END",
+                        "  + CASE WHEN EXISTS (",
+                        "      SELECT 1 FROM recipe_ingredients ri",
+                        "      INNER JOIN ingredients i ON i.id = ri.ingredient_id",
+                        "      WHERE ri.recipe_id = r.id AND i.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    ) THEN 22 ELSE 0 END",
+                        ") AS searchScore",
+                        "FROM recipes r",
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id",
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id",
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id",
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id",
+                        "WHERE r.status = 1",
+                        "AND (",
+                        "  r.title LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(r.author, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(ta.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(tech.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(tc.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(d.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR EXISTS (",
+                        "      SELECT 1 FROM recipe_categories rc",
+                        "      INNER JOIN categories c ON c.id = rc.category_id",
+                        "      WHERE rc.recipe_id = r.id AND c.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    )",
+                        "  OR EXISTS (",
+                        "      SELECT 1 FROM recipe_ingredients ri",
+                        "      INNER JOIN ingredients i ON i.id = ri.ingredient_id",
+                        "      WHERE ri.recipe_id = r.id AND i.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    )",
+                        ")",
+                        "<choose>",
+                        "  <when test='sort == \"hot\"'>",
+                        "    ORDER BY r.like_count DESC, r.create_time DESC",
+                        "  </when>",
+                        "  <when test='sort == \"new\"'>",
+                        "    ORDER BY r.create_time DESC",
+                        "  </when>",
+                        "  <otherwise>",
+                        "    ORDER BY searchScore DESC, r.like_count DESC, r.create_time DESC",
+                        "  </otherwise>",
+                        "</choose>",
+                        "LIMIT #{offset}, #{pageSize}",
+                        "</script>"
+        })
         List<Recipe> searchByKeyword(@Param("keyword") String keyword,
+                        @Param("sort") String sort,
                         @Param("offset") int offset,
                         @Param("pageSize") int pageSize);
 
-        @Select("SELECT COUNT(*) FROM recipes WHERE status = 1 AND title LIKE CONCAT('%', #{keyword}, '%')")
-        long countByKeyword(String keyword);
+        @Select({
+                        "<script>",
+                        "SELECT COUNT(*)",
+                        "FROM recipes r",
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id",
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id",
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id",
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id",
+                        "WHERE r.status = 1",
+                        "AND (",
+                        "  r.title LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(r.author, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(ta.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(tech.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(tc.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR COALESCE(d.name, '') LIKE CONCAT('%', #{keyword}, '%')",
+                        "  OR EXISTS (",
+                        "      SELECT 1 FROM recipe_categories rc",
+                        "      INNER JOIN categories c ON c.id = rc.category_id",
+                        "      WHERE rc.recipe_id = r.id AND c.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    )",
+                        "  OR EXISTS (",
+                        "      SELECT 1 FROM recipe_ingredients ri",
+                        "      INNER JOIN ingredients i ON i.id = ri.ingredient_id",
+                        "      WHERE ri.recipe_id = r.id AND i.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "    )",
+                        ")",
+                        "</script>"
+        })
+        long countByKeyword(@Param("keyword") String keyword);
 
-        @Select("SELECT r.*, d.name as difficultyName, t.name as timeCostName " +
+        @Select({
+                        "<script>",
+                        "SELECT r.title",
+                        "FROM recipes r",
+                        "WHERE r.status = 1",
+                        "AND r.title IS NOT NULL AND r.title != ''",
+                        "AND r.title LIKE CONCAT('%', #{keyword}, '%')",
+                        "GROUP BY r.title",
+                        "ORDER BY",
+                        "MIN(CASE",
+                        "  WHEN r.title = #{keyword} THEN 0",
+                        "  WHEN r.title LIKE CONCAT(#{keyword}, '%') THEN 1",
+                        "  ELSE 2",
+                        "END),",
+                        "MAX(r.like_count) DESC, MAX(r.create_time) DESC",
+                        "LIMIT #{limit}",
+                        "</script>"
+        })
+        List<String> findTitleSuggestions(@Param("keyword") String keyword, @Param("limit") int limit);
+
+        @Select({
+                        "<script>",
+                        "SELECT r.author",
+                        "FROM recipes r",
+                        "WHERE r.status = 1",
+                        "AND r.author IS NOT NULL AND r.author != ''",
+                        "AND r.author LIKE CONCAT('%', #{keyword}, '%')",
+                        "GROUP BY r.author",
+                        "ORDER BY COUNT(*) DESC, MAX(r.like_count) DESC",
+                        "LIMIT #{limit}",
+                        "</script>"
+        })
+        List<String> findAuthorSuggestions(@Param("keyword") String keyword, @Param("limit") int limit);
+
+        @Select({
+                        "<script>",
+                        "SELECT c.name",
+                        "FROM categories c",
+                        "INNER JOIN recipe_categories rc ON rc.category_id = c.id",
+                        "INNER JOIN recipes r ON r.id = rc.recipe_id",
+                        "WHERE r.status = 1",
+                        "AND c.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "GROUP BY c.id, c.name",
+                        "ORDER BY COUNT(DISTINCT rc.recipe_id) DESC, c.name ASC",
+                        "LIMIT #{limit}",
+                        "</script>"
+        })
+        List<String> findCategorySuggestions(@Param("keyword") String keyword, @Param("limit") int limit);
+
+        @Select({
+                        "<script>",
+                        "SELECT i.name",
+                        "FROM ingredients i",
+                        "INNER JOIN recipe_ingredients ri ON ri.ingredient_id = i.id",
+                        "INNER JOIN recipes r ON r.id = ri.recipe_id",
+                        "WHERE r.status = 1",
+                        "AND i.name LIKE CONCAT('%', #{keyword}, '%')",
+                        "GROUP BY i.id, i.name",
+                        "ORDER BY COUNT(DISTINCT ri.recipe_id) DESC, i.name ASC",
+                        "LIMIT #{limit}",
+                        "</script>"
+        })
+        List<String> findIngredientSuggestions(@Param("keyword") String keyword, @Param("limit") int limit);
+
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "WHERE r.id >= (SELECT FLOOR(RAND() * (SELECT MAX(id) FROM recipes))) " +
                         "AND r.status = 1 " +
                         "ORDER BY r.id LIMIT #{limit}")
         List<Recipe> findRandom(@Param("limit") int limit);
 
         @Select("<script>" +
-                        "SELECT DISTINCT r.*, d.name as difficultyName, t.name as timeCostName " +
+                        "SELECT DISTINCT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
                         "FROM recipes r " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN time_costs t ON r.time_cost_id = t.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
                         "INNER JOIN recipe_ingredients ri ON r.id = ri.recipe_id AND ri.ingredient_type = 'main' " +
-                        "INNER JOIN ingredients i ON ri.ingredient_id = i.id " +
                         "WHERE r.id != #{recipeId} " +
-                        "AND i.name IN " +
-                        "<foreach item='ingredient' collection='mainIngredients' open='(' separator=',' close=')'>" +
-                        "        #{ingredient} " +
+                        "AND ri.ingredient_id IN " +
+                        "<foreach item='ingredientId' collection='mainIngredientIds' open='(' separator=',' close=')'>" +
+                        "        #{ingredientId} " +
                         "</foreach> " +
                         "AND r.status = 1 " +
                         "ORDER BY r.like_count DESC " +
                         "LIMIT #{limit}" +
                         "</script>")
         List<Recipe> findSimilarByIngredients(@Param("recipeId") Integer recipeId,
-                        @Param("mainIngredients") List<String> mainIngredients,
+                        @Param("mainIngredientIds") List<Integer> mainIngredientIds,
                         @Param("limit") int limit);
 
         @Update("UPDATE recipes SET like_count = like_count + 1 WHERE id = #{id}")
@@ -176,16 +351,8 @@ public interface RecipeMapper {
         int updateStatus(@Param("id") Integer id, @Param("status") Integer status);
 
         @Select("<script>" +
-                        "SELECT r.*, " +
-                        "d.name as difficultyName, " +
-                        "t.name as tasteName, " +
-                        "tech.name as techniqueName, " +
-                        "tc.name as timeCostName " +
+                        "SELECT r.id " +
                         "FROM recipes r " +
-                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
-                        "LEFT JOIN tastes t ON r.taste_id = t.id " +
-                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
-                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
                         "WHERE 1=1 " +
                         "<if test='keyword != null and keyword != \"\"'>" +
                         "AND (r.title LIKE CONCAT('%', #{keyword}, '%') OR r.author LIKE CONCAT('%', #{keyword}, '%')) " +
@@ -214,10 +381,10 @@ public interface RecipeMapper {
                         "<if test='endTime != null and endTime != \"\"'>" +
                         "AND r.create_time &lt;= #{endTime} " +
                         "</if>" +
-                        "ORDER BY r.create_time DESC " +
+                        "ORDER BY r.create_time DESC, r.id DESC " +
                         "LIMIT #{offset}, #{pageSize}" +
                         "</script>")
-        List<Recipe> findForAdmin(@Param("keyword") String keyword,
+        List<Integer> findAdminRecipeIds(@Param("keyword") String keyword,
                         @Param("categoryId") Integer categoryId,
                         @Param("tasteId") Integer tasteId,
                         @Param("techniqueId") Integer techniqueId,
@@ -228,6 +395,24 @@ public interface RecipeMapper {
                         @Param("endTime") String endTime,
                         @Param("offset") int offset,
                         @Param("pageSize") int pageSize);
+
+        @Select("<script>" +
+                        "SELECT r.*, " +
+                        "d.name as difficultyName, " +
+                        "t.name as tasteName, " +
+                        "tech.name as techniqueName, " +
+                        "tc.name as timeCostName " +
+                        "FROM recipes r " +
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
+                        "LEFT JOIN tastes t ON r.taste_id = t.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "WHERE r.id IN " +
+                        "<foreach collection='ids' item='id' open='(' separator=',' close=')'>" +
+                        "#{id}" +
+                        "</foreach>" +
+                        "</script>")
+        List<Recipe> findAdminByIds(@Param("ids") List<Integer> ids);
 
         @Select("<script>" +
                         "SELECT COUNT(*) FROM recipes r " +

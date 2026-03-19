@@ -1,10 +1,38 @@
 # 美食推荐系统 - API 接口文档
 
-> **版本**: v2.0  
-> **最后更新**: 2026-03-01  
-> **基准 URL**: `http://localhost:8080/api`  
+> **版本**: v2.4  
+> **最后更新**: 2026-03-19 13:07:08  
+> **基准 URL**: `http://localhost:8081/api`  
 > **数据格式**: JSON  
 > **字符编码**: UTF-8
+
+## 2026-03-19 增量说明
+
+- 本地开发默认后端端口为 `8081`。
+- 搜索接口当前支持两套后端实现：
+  - `search.engine=mysql`：沿用 MySQL 多字段混合检索
+  - `search.engine=elasticsearch`：切换到 Elasticsearch 检索，再回 MySQL 补全展示字段
+- 搜索能力当前已升级为 Search V2：
+  - `GET /recipes/search` 新增 `sort` 参数，支持 `relevance`、`hot`、`new`
+  - Elasticsearch 路径使用 `smartcn` 中文分词
+  - 核心召回覆盖标题、作者、食材、分类
+  - 意图字段（口味、做法、耗时、难度）仅在核心召回无结果时作为 fallback
+  - 新增 `GET /recipes/search/suggestions`
+- Elasticsearch 建议词已改为独立 completion 字段，不再复用主搜索字段
+- 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置仍保留 `mysql` 作为首次部署默认值
+- 以下列表型接口返回项已统一补充作者字段：
+  - `GET /recipes`
+  - `GET /recipes/search`
+  - `GET /recipes/recommend`
+  - `GET /recipes/{id}/similar`
+- 推荐接口当前支持“基于现有分类的个性化筛选”：
+  - `GET /recipes/recommend` 新增可选 `categoryId`
+  - 推荐页前端已从硬编码场景切换为现有分类筛选
+  - 当前前端默认展示的分类包括 `家常菜 / 快手菜 / 减肥瘦身 / 宴客菜 / 夜宵 / 下饭菜 / 儿童 / 早餐`
+- 上述返回项新增字段：
+  - `author`：作者名称
+  - `authorUid`：作者用户 ID
+- 本次更新同时对推荐/相似菜谱查询、统计缓存与启动性能做了实现优化，但不改变接口调用方式。
 
 ---
 
@@ -546,15 +574,16 @@ LIMIT 0, 10;
 
 **接口地址**: `GET /recipes/search`
 
-**功能描述**: 根据关键词搜索菜谱
+**功能描述**: 根据关键词搜索菜谱，支持多字段混合检索与排序
 
 **请求参数**:
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| keyword | string | 是 | - | 搜索关键词（标题、作者） |
+| keyword | string | 否 | - | 搜索关键词 |
+| sort | string | 否 | relevance | 排序方式：`relevance`-综合相关、`hot`-热门优先、`new`-最新发布 |
 | page | int | 否 | 1 | 页码 |
-| pageSize | int | 否 | 10 | 每页数量 |
+| pageSize | int | 否 | 12 | 每页数量 |
 
 **响应示例**:
 
@@ -566,32 +595,106 @@ LIMIT 0, 10;
     "list": [
       {
         "id": 1,
-        "title": "红烧肉",
+        "name": "红烧肉",
         "author": "美食达人",
         "image": "https://example.com/recipe1.jpg",
-        "description": "美味的红烧肉"
+        "difficulty": "普通",
+        "time": "30分钟",
+        "taste": "家常",
+        "likeCount": 156,
+        "favoriteCount": 48,
+        "replyCount": 12,
+        "categories": ["家常菜", "肉类"],
+        "ingredients": ["五花肉", "冰糖"]
       }
     ],
     "total": 156,
     "page": 1,
-    "pageSize": 10
+    "pageSize": 12
   }
 }
 ```
 
-**数据库表**: `recipes`
+**检索范围**:
 
-**使用的索引**: 建议使用全文索引或 LIKE 查询
+- `recipes.title`
+- `recipes.author`
+- `ingredients.name`
+- `categories.name`
+- `tastes.name`
+- `techniques.name`
+- `time_costs.name`
+- `difficulties.name`
 
-**SQL 示例**:
+**数据库表**: `recipes`, `recipe_ingredients`, `ingredients`, `recipe_categories`, `categories`, `tastes`, `techniques`, `time_costs`, `difficulties`
 
-```sql
-SELECT id, title, author, image, description
-FROM recipes
-WHERE title LIKE '%关键词%' OR author LIKE '%关键词%'
-ORDER BY rating_count DESC
-LIMIT 0, 10;
+**说明**:
+
+- `sort=relevance` 时，后端会基于标题完全匹配、标题前缀、作者、分类、食材等信号进行轻量评分。
+- 空关键词会返回空列表，不报错。
+- 当前返回列表项中的菜名字段为 `name`。
+
+**实现说明**:
+
+- 当前实现支持通过 `search.engine` 在 MySQL 与 Elasticsearch 之间切换。
+- 默认仓库配置仍为 MyBatis 注解 SQL + `LIKE` / `EXISTS` 子查询的轻量混合搜索。
+- 当启用 Elasticsearch 时，搜索接口会先在索引别名 `recipes_search` 上检索，再回 MySQL 按命中顺序补全菜谱详情。
+- Search V2 的 ES 查询策略为：
+  - `combined_fields(title, ingredients, categories, author)` + `operator=and` 做核心召回
+  - `title.keyword / ingredients.keyword` 精确命中和 `match_phrase` 做精排
+  - `tasteName / techniqueName / timeCostName / difficultyName` 仅在核心召回无结果时参与 fallback
+- 当前这套实现已经规避了“`草鱼` 被 `鱼腥草` 等单字命中污染结果”的主要问题。
+- 本轮未引入向量检索、大模型查询改写或语义搜索。
+
+#### 搜索建议词
+
+**接口地址**: `GET /recipes/search/suggestions`
+
+**功能描述**: 根据输入内容返回搜索建议词
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| keyword | string | 否 | - | 当前输入内容 |
+| limit | int | 否 | 8 | 返回数量上限 |
+
+**实现说明**:
+
+- Elasticsearch 路径下，建议词来自独立的 completion 字段：
+  - `titleSuggest`
+  - `ingredientSuggest`
+  - `categorySuggest`
+  - `authorSuggest`
+- 当前服务端会按类型配额合并并去重，避免标题建议词淹没食材/分类/作者建议词。
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "value": "鸡胸肉",
+      "type": "ingredient",
+      "typeLabel": "食材"
+    },
+    {
+      "value": "家常菜",
+      "type": "category",
+      "typeLabel": "分类"
+    }
+  ]
+}
 ```
+
+**返回说明**:
+
+- `type` 可能值：`title`、`ingredient`、`category`、`author`
+- 返回结果已按来源优先级与去重规则聚合
+- 空关键词返回空数组，不报错
+- 当启用 Elasticsearch 时，建议词来源于索引中已写入的标题、食材、分类、作者字段
 
 ---
 
@@ -605,8 +708,10 @@ LIMIT 0, 10;
 
 | 参数 | 类型 | 必填 | 默认值 | 说明 |
 |------|------|------|--------|------|
-| limit | int | 否 | 10 | 返回数量 |
-| type | string | 否 | hot | 推荐类型：hot-热门/new-最新 |
+| limit | int | 否 | 16 | 返回数量 |
+| type | string | 否 | personal | 推荐类型：personal-个性化/hot-热门/new-最新 |
+| categoryId | int | 否 | - | 分类 ID，用于在推荐页按现有分类筛选 |
+| scene | string | 否 | - | 兼容旧版场景筛选参数，当前推荐页默认不再使用 |
 
 **请求头** (可选):
 
@@ -621,15 +726,26 @@ Authorization: Bearer <token>
   "code": 200,
   "message": "success",
   "data": {
+    "reason": "根据你的偏好推荐（分类：减肥瘦身）",
     "list": [
       {
         "id": 1,
-        "title": "红烧肉",
+        "name": "凉拌莴笋丝",
+        "author": "厨友小李",
+        "authorUid": "usr_1024",
         "image": "https://example.com/recipe1.jpg",
-        "likeCount": 567
+        "difficulty": "简单",
+        "time": "十分钟",
+        "taste": "咸鲜",
+        "likeCount": 567,
+        "favoriteCount": 120,
+        "replyCount": 16,
+        "categories": ["减肥瘦身", "凉菜"],
+        "ingredients": ["莴笋", "蒜末"],
+        "sceneTags": ["减脂", "快手"],
+        "reasons": ["符合你的饮食目标：减脂", "属于你选择的分类：减肥瘦身"]
       }
-    ],
-    "hasMore": true
+    ]
   }
 }
 ```
@@ -637,15 +753,16 @@ Authorization: Bearer <token>
 **数据库表**: `recipes`
 
 **使用的索引**: 
-- `idx_recipe_difficulty` (按难度筛选)
-- `recipes.create_time` (按时间排序)
-- `recipes.like_count` (按点赞排序)
+- `idx_recipes_status_create_time` (最新推荐)
+- `idx_recipes_status_like_count` (热门推荐)
+- `idx_recipe_categories_composite` / `uk_recipe_category` (分类筛选)
 
 **推荐算法**:
 
 1. **热门推荐**: 按 `like_count` 降序排列
 2. **最新推荐**: 按 `create_time` 降序排列
-3. **个性化推荐** (登录用户): 根据用户浏览历史和收藏记录推荐
+3. **个性化推荐** (登录用户): 根据用户浏览历史、收藏、行为埋点与偏好重排
+4. **分类筛选推荐**: 当传入 `categoryId` 时，会先扩大候选池，再按分类过滤并补齐结果，避免出现有效分类却空列表
 
 ---
 
@@ -1288,6 +1405,34 @@ Authorization: Bearer <admin_token>
 
 ---
 
+## 增量接口（2026-03-18）
+
+### 用户烹饪会话
+
+1. `POST /users/cooking-sessions/start`
+- 说明：开始烹饪会话；若存在未完成会话则返回上次进度（断点恢复）。
+- 请求体：`{ "recipeId": 123 }`
+
+2. `PUT /users/cooking-sessions/{sessionId}/progress`
+- 说明：保存步骤进度与累计时长。
+- 请求体：`{ "currentStep": 3, "durationMs": 125000 }`
+
+3. `POST /users/cooking-sessions/{sessionId}/finish`
+- 说明：完成本次烹饪会话。
+- 请求体：`{ "durationMs": 260000 }`
+
+### 用户 7 日报告
+
+1. `GET /users/reports/7d`
+- 说明：返回用户近 7 日烹饪次数、完成率、场景偏好、口味偏好、活跃时段、总结与建议。
+
+### 新增数据表
+
+- `cooking_sessions`
+  - 用途：记录烹饪进度、会话状态、累计时长，支撑断点恢复与报告统计。
+
+---
+
 **文档维护**: 开发团队  
-**最后更新**: 2026-03-01  
-**版本**: v2.0
+**最后更新**: 2026-03-19 10:35:23  
+**版本**: v2.4

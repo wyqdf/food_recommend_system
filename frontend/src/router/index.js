@@ -17,6 +17,12 @@ const routes = [
         component: () => import("@/views/RecipeDetail.vue"),
       },
       {
+        path: "recipe/:id/cook",
+        name: "CookingMode",
+        component: () => import("@/views/CookingMode.vue"),
+        meta: { requiresAuth: true },
+      },
+      {
         path: "search",
         name: "Search",
         component: () => import("@/views/Search.vue"),
@@ -31,6 +37,12 @@ const routes = [
         path: "user/favorites",
         name: "Favorites",
         component: () => import("@/views/user/Favorites.vue"),
+        meta: { requiresAuth: true },
+      },
+      {
+        path: "user/report",
+        name: "UserReport",
+        component: () => import("@/views/user/UserReport.vue"),
         meta: { requiresAuth: true },
       },
       {

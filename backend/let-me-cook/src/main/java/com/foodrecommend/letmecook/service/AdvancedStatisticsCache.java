@@ -4,11 +4,15 @@ import com.foodrecommend.letmecook.dto.admin.AdvancedStatisticsDTO;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
+import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
@@ -19,6 +23,9 @@ public class AdvancedStatisticsCache {
     private final AdvancedStatisticsService advancedStatisticsService;
     private final ReentrantLock refreshLock = new ReentrantLock();
 
+    @Value("${statistics.advanced.refresh-on-startup:true}")
+    private boolean refreshOnStartup;
+
     private volatile AdvancedStatisticsDTO advancedStatistics = new AdvancedStatisticsDTO();
     private volatile List<AdvancedStatisticsDTO.TechniqueStatItem> difficultyDistribution = List.of();
     private volatile List<AdvancedStatisticsDTO.TechniqueStatItem> timeCostDistribution = List.of();
@@ -28,10 +35,22 @@ public class AdvancedStatisticsCache {
     @PostConstruct
     public void initialize() {
         log.info("Initializing advanced statistics cache at startup...");
-        refreshWithRecalculation("startup");
+        reloadCacheSafely();
     }
 
-    @Scheduled(fixedDelayString = "${statistics.advanced.cache-refresh-ms:3600000}")
+    @EventListener(ApplicationReadyEvent.class)
+    public void warmUpAfterStartup() {
+        if (!refreshOnStartup) {
+            log.info("Skip advanced statistics refresh on startup because it is disabled by configuration");
+            return;
+        }
+        CompletableFuture.runAsync(() -> refreshWithRecalculation("startup"));
+    }
+
+    @Scheduled(
+            initialDelayString = "${statistics.advanced.initial-delay-ms:300000}",
+            fixedDelayString = "${statistics.advanced.cache-refresh-ms:3600000}"
+    )
     public void scheduledRefresh() {
         refreshWithRecalculation("scheduled");
     }
@@ -76,6 +95,15 @@ public class AdvancedStatisticsCache {
             return "刷新失败: " + e.getMessage();
         } finally {
             refreshLock.unlock();
+        }
+    }
+
+    private void reloadCacheSafely() {
+        try {
+            reloadCache();
+            log.info("Advanced statistics cache loaded from summary tables at {}", lastRefreshTime);
+        } catch (Exception e) {
+            log.warn("Failed to load advanced statistics cache from summary tables at startup: {}", e.getMessage());
         }
     }
 

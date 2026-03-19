@@ -11,4 +11,8 @@ public interface UserService {
     UserProfileDTO getProfile(Integer userId);
     
     void updateProfile(Integer userId, UpdateUserRequest request);
+
+    OnboardingProfileDTO getOnboardingProfile(Integer userId);
+
+    void updateOnboardingProfile(Integer userId, UpdateOnboardingRequest request);
 }

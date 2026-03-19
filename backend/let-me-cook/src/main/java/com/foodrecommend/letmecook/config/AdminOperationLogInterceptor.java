@@ -65,6 +65,8 @@ public class AdminOperationLogInterceptor implements HandlerInterceptor {
             rule("DELETE", "^/api/admin/logs/cleanup$", "CLEANUP_LOG", "日志管理", "清理历史日志", false),
 
             rule("POST", "^/api/admin/statistics/refresh$", "REFRESH_STATISTICS", "统计管理", "刷新统计数据", false)
+            ,
+            rule("POST", "^/api/admin/search/index/rebuild$", "REBUILD_SEARCH_INDEX", "搜索管理", "重建搜索索引", false)
     );
 
     private final AdminLogService adminLogService;
@@ -140,6 +142,7 @@ public class AdminOperationLogInterceptor implements HandlerInterceptor {
         if (uri.startsWith("/api/admin/categories")) return "分类管理";
         if (uri.startsWith("/api/admin/logs")) return "日志管理";
         if (uri.startsWith("/api/admin/statistics")) return "统计管理";
+        if (uri.startsWith("/api/admin/search")) return "搜索管理";
         if (uri.startsWith("/api/admin/tastes")
                 || uri.startsWith("/api/admin/techniques")
                 || uri.startsWith("/api/admin/time-costs")

@@ -134,20 +134,20 @@ public class AdvancedStatisticsService {
     }
 
     private List<AdvancedStatisticsDTO.ActiveUserItem> getActiveUsers() {
-        List<Map<String, Object>> rows = advancedStatisticsMapper.getTopActiveUsers(20);
+        List<ActiveUsersSummary> rows = statisticsSummaryMapper.getLatestActiveUsers(20);
         List<AdvancedStatisticsDTO.ActiveUserItem> result = new ArrayList<>();
-        for (Map<String, Object> row : rows) {
-            Integer userId = MapValueUtils.getInt(row, "user_id");
-            String username = MapValueUtils.getString(row, "username");
+        for (ActiveUsersSummary row : rows) {
+            Integer userId = row.getUserId();
+            String username = row.getUsername();
             if (userId == null || username == null || username.isBlank()) {
                 continue;
             }
             AdvancedStatisticsDTO.ActiveUserItem user = new AdvancedStatisticsDTO.ActiveUserItem();
             user.setUserId(userId);
             user.setUsername(username);
-            user.setRecipeCount(MapValueUtils.getIntOrDefault(row, 0, "recipe_count"));
-            user.setCommentCount(MapValueUtils.getIntOrDefault(row, 0, "comment_count"));
-            user.setTotalScore(MapValueUtils.getIntOrDefault(row, 0, "total_score"));
+            user.setRecipeCount(row.getRecipeCount() != null ? row.getRecipeCount() : 0);
+            user.setCommentCount(row.getCommentCount() != null ? row.getCommentCount() : 0);
+            user.setTotalScore(row.getTotalScore() != null ? row.getTotalScore() : 0);
             result.add(user);
         }
         return result;
@@ -246,10 +246,10 @@ public class AdvancedStatisticsService {
 
         String sql = """
                 INSERT INTO ingredient_usage_summary (stat_date, ingredient_id, ingredient_name, recipe_count)
-                SELECT ?, ri.ingredient_id, i.name, COUNT(*) as cnt
+                SELECT ?, ri.ingredient_id, i.name, COUNT(DISTINCT ri.recipe_id) as cnt
                 FROM recipe_ingredients ri
                 INNER JOIN ingredients i ON ri.ingredient_id = i.id
-                GROUP BY ri.ingredient_id
+                GROUP BY ri.ingredient_id, i.name
                 ORDER BY cnt DESC
                 LIMIT 20
                 """;
