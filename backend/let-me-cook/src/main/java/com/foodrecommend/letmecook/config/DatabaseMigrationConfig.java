@@ -40,6 +40,8 @@ public class DatabaseMigrationConfig {
             addUserPreferenceProfilesTable();
             addBehaviorEventsTable();
             addCookingSessionsTable();
+            addDailyRecommendationTables();
+            refreshCommentInsertTrigger();
             
             log.info("开始执行数据库性能优化索引...");
             addIndexIfNotExists("idx_comment_recipe_publish_time", "comments", "recipe_id, publish_time DESC, id DESC");
@@ -79,6 +81,33 @@ public class DatabaseMigrationConfig {
 
             log.info("数据库迁移和性能优化执行完成");
         };
+    }
+
+    private void refreshCommentInsertTrigger() {
+        try {
+            log.info("刷新评论插入触发器，避免整表 COUNT(*) 拖慢写入...");
+            jdbcTemplate.execute("DROP TRIGGER IF EXISTS trg_comment_insert");
+            jdbcTemplate.execute("""
+                    CREATE TRIGGER trg_comment_insert
+                    AFTER INSERT ON comments
+                    FOR EACH ROW
+                    BEGIN
+                        INSERT INTO statistics_overview (stat_date, total_comments)
+                        VALUES (CURDATE(), 1)
+                        ON DUPLICATE KEY UPDATE
+                            total_comments = total_comments + 1;
+
+                        INSERT INTO comment_trend_daily (stat_date, new_comments_count, total_comments)
+                        VALUES (CURDATE(), 1, 1)
+                        ON DUPLICATE KEY UPDATE
+                            new_comments_count = new_comments_count + 1,
+                            total_comments = total_comments + 1;
+                    END
+                    """);
+            log.info("评论插入触发器刷新完成");
+        } catch (Exception e) {
+            log.warn("刷新评论插入触发器失败：{}", e.getMessage());
+        }
     }
     
     private void addCookwaresTable() {
@@ -377,6 +406,73 @@ public class DatabaseMigrationConfig {
             log.info("cooking_sessions 表创建完成");
         } catch (Exception e) {
             log.warn("创建 cooking_sessions 表失败：{}", e.getMessage());
+        }
+    }
+
+    private void addDailyRecommendationTables() {
+        try {
+            if (!checkTableExists("daily_recipe_recommendations")) {
+                log.info("创建 daily_recipe_recommendations 表...");
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS daily_recipe_recommendations (
+                            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                            user_id INT NOT NULL,
+                            biz_date DATE NOT NULL,
+                            recipe_id INT NOT NULL,
+                            rank_no INT NOT NULL,
+                            selected_for_delivery TINYINT DEFAULT 0,
+                            model_score DECIMAL(16,8) DEFAULT 0,
+                            reason_json JSON NULL,
+                            model_version VARCHAR(64) NOT NULL,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            CONSTRAINT fk_daily_reco_user
+                                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                            CONSTRAINT fk_daily_reco_recipe
+                                FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+                            UNIQUE KEY uk_daily_reco_user_date_rank (user_id, biz_date, rank_no),
+                            UNIQUE KEY uk_daily_reco_user_date_recipe (user_id, biz_date, recipe_id)
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日推荐结果表'
+                        """);
+                log.info("daily_recipe_recommendations 表创建完成");
+            } else {
+                log.info("daily_recipe_recommendations 表已存在，跳过创建");
+            }
+
+            if (!checkTableExists("daily_recommend_job_runs")) {
+                log.info("创建 daily_recommend_job_runs 表...");
+                jdbcTemplate.execute("""
+                        CREATE TABLE IF NOT EXISTS daily_recommend_job_runs (
+                            id BIGINT PRIMARY KEY AUTO_INCREMENT,
+                            job_date DATE NOT NULL,
+                            phase VARCHAR(32) NOT NULL,
+                            model_version VARCHAR(64) NOT NULL,
+                            affected_users INT DEFAULT 0,
+                            affected_recipes INT DEFAULT 0,
+                            status VARCHAR(20) NOT NULL DEFAULT 'running',
+                            error_message TEXT NULL,
+                            started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                            finished_at DATETIME NULL
+                        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日推荐任务执行记录表'
+                        """);
+                log.info("daily_recommend_job_runs 表创建完成");
+            } else {
+                log.info("daily_recommend_job_runs 表已存在，跳过创建");
+            }
+
+            addIndexIfNotExists("idx_daily_reco_user_date_delivery",
+                    "daily_recipe_recommendations",
+                    "user_id, biz_date, selected_for_delivery, rank_no");
+            addIndexIfNotExists("idx_daily_reco_date_version",
+                    "daily_recipe_recommendations",
+                    "biz_date, model_version");
+            addIndexIfNotExists("idx_daily_job_runs_date_phase",
+                    "daily_recommend_job_runs",
+                    "job_date, phase, status");
+            addIndexIfNotExists("idx_daily_job_runs_started",
+                    "daily_recommend_job_runs",
+                    "started_at DESC");
+        } catch (Exception e) {
+            log.warn("创建每日推荐相关表失败：{}", e.getMessage());
         }
     }
 

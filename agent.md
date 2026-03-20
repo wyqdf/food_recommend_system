@@ -2,7 +2,7 @@
 
 > 文档定位：给新工程师和新大模型快速接手 `foodrec` 项目的单文件总入口  
 > 适用范围：`F:\Desktop\大创\foodrec` 全仓  
-> 最后核对日期：2026-03-19  
+> 最后核对日期：2026-03-20  
 > 当前事实来源优先级：**源码 > 本文档 > `docs/` 专题文档 > 根目录 `readme.md`（快速启动入口）**  
 > 特别提醒：根目录 [readme.md](./readme.md) 现在已更新为“快速上手入口”，适合本地启动；涉及系统全貌、数据库细节、搜索运行态时，仍应优先以源码和本文档为准
 
@@ -19,6 +19,16 @@
 5. 数据库真实结构是什么，建表语句和索引在哪里。
 6. 启动时哪些表、列、索引会被程序自动补齐。
 7. 接手后应该从哪里开始读、从哪里开始改。
+
+数据库补丁补充：
+
+- 如果导入的是较旧整库备份，除了备份本体外，还应再执行：
+  - `backend/let-me-cook/src/main/resources/db/migration/V6__daily_recommendation_comment_patch.sql`
+- 这份补丁会补齐：
+  - `daily_recipe_recommendations`
+  - `daily_recommend_job_runs`
+  - 各属性表 `recipe_count`
+  - 评论性能索引与增量触发器
 
 这份文档适用于：
 
@@ -148,7 +158,7 @@ flowchart LR
 
 - 默认后端端口是 `8081`
 - 默认数据库连接是 `jdbc:mysql://localhost:3306/food_recommend`
-- 仓库默认 `search.engine=${SEARCH_ENGINE:mysql}`
+- 仓库默认 `search.engine=${SEARCH_ENGINE:auto}`
 - 仓库默认 ES 地址是 `http://127.0.0.1:9200`
 - 仓库默认 OSS 本地关闭：`aliyun.oss.enabled=false`
 
@@ -157,8 +167,8 @@ flowchart LR
 这个项目有一组非常重要的“默认值 != 当前运行态”的差异：
 
 - **搜索开关**
-  - 仓库默认：`search.engine=mysql`
-  - 当前本地运行态：`SEARCH_ENGINE=elasticsearch`
+  - 仓库默认：`search.engine=auto`
+  - 当前本地运行态：ES 可用时自动切到 `elasticsearch`
 - **前端端口**
   - Vite 默认：`3000`
   - 当前本地常用：`5173`（Docker Nginx）
@@ -390,7 +400,7 @@ flowchart LR
 
 重要事实：
 
-- 仓库默认 `search.engine=mysql`
+- 仓库默认 `search.engine=auto`
 - 当前本地运行态已切到 `elasticsearch`
 
 ### 7.2 推荐现状
@@ -416,6 +426,46 @@ flowchart LR
 - 个人推荐会先扩大候选池
 - 再按分类过滤
 - 如果过滤后结果不足，会用该分类热门菜谱补齐
+
+当前还存在一条**离线 Top100 推荐链路**：
+
+- 入口仍复用：
+  - `GET /api/recipes/recommend`
+- 当前后端行为：
+  - 对登录用户，如果 `type=personal` 或 `type=daily`
+  - 会先查 `daily_recipe_recommendations`
+  - 如果该用户当天存在离线 `Top100`
+    - 优先返回这批离线结果
+  - 如果不存在
+    - 回退现有实时推荐
+- 这条离线链路在仓库内保留：
+  - `local_top100_cke_full/selected_model_manifest.json`
+  - `local_top100_cke_full/README.md`
+  - `scripts/recommendation_daily/`
+- 大型模型权重、缓存数据和运行工件不随普通 Git 推送
+- 当前默认使用的历史最优模型是：
+  - `CKEFull`
+  - 数据集：`meishitianxia_v1`
+  - 模型文件：本地离线 bundle 中的 `model_epoch0030.pt`
+- 当前已验证的离线落库结果：
+  - 可映射用户 `5460`
+  - 每用户 `Top100`
+  - 总写入 `546000` 行
+  - 每用户前 `16` 条标记为 `selected_for_delivery=1`
+
+要点：
+
+- 前端**当前并没有单独做“今日推荐”页面改造**
+- 但对于命中离线结果的用户，现有推荐页的 `personal` 结果已经会优先命中这批 `Top100`
+- 当前 `personal` 结果已改成混合模式：
+  - 约 `50%` 直接来自离线 `Top100`
+  - 约 `50%` 来自实时推荐链路
+  - 当用户在推荐页选择分类时，这部分实时推荐会严格按所选分类过滤
+  - 两部分结果在返回前会随机打乱顺序
+  - 分类筛选下的实时 `50%` 不再走重型个性化重排，而是走轻量分类推荐，优先保证切换分类时的响应速度
+- 推荐页分类筛选不再硬编码固定分类，前端改为调用 `GET /api/categories/recommend?limit=10`
+- 后端热门分类来源于 `categories.recipe_count`，并走应用缓存，不在请求时对 `recipe_categories` 做全量计数
+- 这意味着“后端已适配，前端 UI 仍是旧推荐页形态”
 
 ### 7.3 行为埋点与画像现状
 
@@ -1293,8 +1343,30 @@ Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8081/api/recipes/search?key
    - 做索引判断时要注意不要误删
 
 6. **搜索运行态与仓库默认配置不同**
-   - 默认配置还是 `mysql`
-   - 本地常用运行态已是 `elasticsearch`
+   - 当前默认配置已改成 `auto`
+   - 启动时优先检测 Elasticsearch，读索引就绪就自动使用 ES
+   - 若 ES 不可用或 alias 未就绪，则自动回退 MySQL
+   - 当前本地常用运行态已是 `elasticsearch`
+
+7. **离线 Top100 不是覆盖全部当前用户**
+   - 当前入库的是历史 `CKEFull` 数据集里能映射回当前库的 `5460` 个用户
+   - 不是当前任意登录用户都能命中离线推荐
+   - 没命中的用户会正常回退到实时推荐
+8. **推荐页 `猜你喜欢` 已改成混合链路**
+   - 命中离线 `Top100` 的用户：结果按 `50% 离线 + 50% 实时` 组装
+   - 两部分在返回前整体打乱顺序
+   - 用户选择分类时，实时 `50%` 严格按该分类筛选
+   - 该实时分类部分使用“分类热门候选池 ID 缓存 + 每次随机抽样详情”，多次点击同一分类结果会变化，且不需要每次重跑重 SQL
+9. **首页推荐已与推荐页口径对齐**
+   - 首页 `为你推荐` 直接调用 `type=personal`
+   - 首页不再对 `为你推荐/热门菜谱` 做 session 缓存
+   - 首页 `热门菜谱` 从热门候选池随机抽样展示
+   - 首页 `热门分类` 直接读取 `/api/categories/recommend?limit=8`
+10. **评论提交链路已做性能修复**
+   - 菜谱详情页发表评论后，会先把新评论立即插到本地列表首位，再后台静默刷新
+   - `POST /api/comments` 现在直接返回完整评论对象，前端不再等二次拉评论列表才显示成功
+   - `comments` 表触发器 `trg_comment_insert` 已从“整表 `COUNT(*)`”改成统计表增量 `+1`
+   - 当前本地实测评论提交耗时约 `45ms~200ms`
 
 ### 12.2 接手后优先检查的 5 件事
 

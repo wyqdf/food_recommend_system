@@ -8,8 +8,15 @@ import java.util.List;
 @Mapper
 public interface CategoryMapper {
 
-        @Select("SELECT c.*, COALESCE((SELECT COUNT(*) FROM recipe_categories rc WHERE rc.category_id = c.id), 0) as recipeCount FROM categories c ORDER BY c.id")
+        @Select("SELECT c.id, c.name, c.create_time, COALESCE(c.recipe_count, 0) AS recipeCount FROM categories c ORDER BY c.id")
         List<Category> findAllWithCount();
+
+        @Select("SELECT c.id, c.name, c.create_time, COALESCE(c.recipe_count, 0) AS recipeCount " +
+                        "FROM categories c " +
+                        "WHERE COALESCE(c.recipe_count, 0) > 0 " +
+                        "ORDER BY c.recipe_count DESC, c.id ASC " +
+                        "LIMIT #{limit}")
+        List<Category> findTopRecommendCategories(@Param("limit") int limit);
 
         @Select("SELECT c.name FROM categories c " +
                         "INNER JOIN recipe_categories rc ON c.id = rc.category_id " +

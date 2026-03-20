@@ -1,7 +1,7 @@
 # 美食推荐系统 - API 接口文档
 
 > **版本**: v2.4  
-> **最后更新**: 2026-03-19 13:07:08  
+> **最后更新**: 2026-03-20 23:59:00  
 > **基准 URL**: `http://localhost:8081/api`  
 > **数据格式**: JSON  
 > **字符编码**: UTF-8
@@ -10,7 +10,7 @@
 
 - 本地开发默认后端端口为 `8081`。
 - 搜索接口当前支持两套后端实现：
-  - `search.engine=mysql`：沿用 MySQL 多字段混合检索
+  - `search.engine=auto`：启动时优先检测 Elasticsearch，可用时走 ES，不可用时自动回退 MySQL
   - `search.engine=elasticsearch`：切换到 Elasticsearch 检索，再回 MySQL 补全展示字段
 - 搜索能力当前已升级为 Search V2：
   - `GET /recipes/search` 新增 `sort` 参数，支持 `relevance`、`hot`、`new`
@@ -19,7 +19,7 @@
   - 意图字段（口味、做法、耗时、难度）仅在核心召回无结果时作为 fallback
   - 新增 `GET /recipes/search/suggestions`
 - Elasticsearch 建议词已改为独立 completion 字段，不再复用主搜索字段
-- 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置仍保留 `mysql` 作为首次部署默认值
+- 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置现为 `auto`
 - 以下列表型接口返回项已统一补充作者字段：
   - `GET /recipes`
   - `GET /recipes/search`
@@ -27,8 +27,11 @@
   - `GET /recipes/{id}/similar`
 - 推荐接口当前支持“基于现有分类的个性化筛选”：
   - `GET /recipes/recommend` 新增可选 `categoryId`
-  - 推荐页前端已从硬编码场景切换为现有分类筛选
-  - 当前前端默认展示的分类包括 `家常菜 / 快手菜 / 减肥瘦身 / 宴客菜 / 夜宵 / 下饭菜 / 儿童 / 早餐`
+  - 推荐页前端分类筛选已改成调用 `GET /categories/recommend?limit=10` 动态读取前 10 热门分类
+  - `type=personal` 命中离线 `Top100` 时，不再完全覆盖实时推荐；当前口径是“离线模型结果 + 严格分类实时推荐”混合返回
+  - 当用户选择分类时，混合结果中实时推荐部分会严格按 `categoryId` 过滤
+  - 混合结果返回前会打乱顺序
+  - 推荐页前端不再缓存 `personal` 结果，分类切换时实时推荐部分允许变化
 - 上述返回项新增字段：
   - `author`：作者名称
   - `authorUid`：作者用户 ID

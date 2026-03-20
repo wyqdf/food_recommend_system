@@ -22,7 +22,7 @@ public interface CommentMapper {
         long countByRecipeId(Integer recipeId);
 
         @Insert("INSERT INTO comments(recipe_id, user_id, content, publish_time, likes) " +
-                        "VALUES(#{recipeId}, #{userId}, #{content}, NOW(), 0)")
+                        "VALUES(#{recipeId}, #{userId}, #{content}, #{publishTime}, 0)")
         @Options(useGeneratedKeys = true, keyProperty = "id")
         int insert(Comment comment);
 

@@ -129,6 +129,17 @@ const categoryColors = [
 const getCategoryIcon = (index) => categoryIcons[index % categoryIcons.length]
 const getCategoryColor = (index) => categoryColors[index % categoryColors.length]
 
+const shuffleArray = (items) => {
+    const next = Array.isArray(items) ? [...items] : []
+    for (let i = next.length - 1; i > 0; i -= 1) {
+        const j = Math.floor(Math.random() * (i + 1))
+        const temp = next[i]
+        next[i] = next[j]
+        next[j] = temp
+    }
+    return next
+}
+
 const handleSearchSubmit = ({ keyword: nextKeyword }) => {
     router.push({ path: '/search', query: { keyword: nextKeyword } })
 }
@@ -151,32 +162,16 @@ const goCategory = (cat) => {
 }
 
 const loadData = async () => {
-    const cachedCategories = sessionStorage.getItem('categories')
-    const cachedRecommend = sessionStorage.getItem('recommendList')
-    const cachedHot = sessionStorage.getItem('hotList')
-
-    if (cachedCategories && cachedRecommend && cachedHot) {
-        categories.value = JSON.parse(cachedCategories)
-        recommendList.value = JSON.parse(cachedRecommend)
-        hotList.value = JSON.parse(cachedHot)
-        return
-    }
-
     loading.value = true
     try {
         const [catRes, recRes, hotRes] = await Promise.all([
-            recipeApi.getCategories(),
+            recipeApi.getRecommendCategories(8),
             recipeApi.getRecommend({ type: 'personal', limit: 8 }),
-            recipeApi.getList({ sort: 'hot', pageSize: 8 })
+            recipeApi.getList({ sort: 'hot', page: 1, pageSize: 48 })
         ])
-        categories.value = catRes.data.slice(0, 8)
+        categories.value = Array.isArray(catRes.data) ? catRes.data.slice(0, 8) : []
         recommendList.value = recRes.data.list || []
-        hotList.value = hotRes.data.list || []
-
-        sessionStorage.setItem('categories', JSON.stringify(categories.value))
-        sessionStorage.setItem('recommendList', JSON.stringify(recommendList.value))
-        sessionStorage.setItem('hotList', JSON.stringify(hotList.value))
-        sessionStorage.setItem('cacheTime', Date.now().toString())
+        hotList.value = shuffleArray(hotRes.data.list || []).slice(0, 8)
     } catch (error) {
         console.error('加载失败:', error)
     } finally {
@@ -186,14 +181,7 @@ const loadData = async () => {
 
 onMounted(async () => {
     trackBehavior('page_view', { sourcePage: 'home' })
-    const cacheTime = sessionStorage.getItem('cacheTime')
-    if (cacheTime && (Date.now() - parseInt(cacheTime)) < 3600000) {
-        categories.value = JSON.parse(sessionStorage.getItem('categories'))
-        recommendList.value = JSON.parse(sessionStorage.getItem('recommendList'))
-        hotList.value = JSON.parse(sessionStorage.getItem('hotList'))
-    } else {
-        await loadData()
-    }
+    await loadData()
 })
 </script>
 

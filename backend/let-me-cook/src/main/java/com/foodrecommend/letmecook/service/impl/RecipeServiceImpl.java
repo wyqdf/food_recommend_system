@@ -21,7 +21,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -30,6 +33,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -38,6 +42,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class RecipeServiceImpl implements RecipeService {
+
+    private static final int CATEGORY_REALTIME_POOL_SIZE = 240;
+    private static final long CATEGORY_REALTIME_POOL_TTL_MILLIS = 10 * 60 * 1000L;
 
     private final RecipeMapper recipeMapper;
     private final CategoryMapper categoryMapper;
@@ -52,10 +59,12 @@ public class RecipeServiceImpl implements RecipeService {
     private final InteractionMapper interactionMapper;
     private final BehaviorEventMapper behaviorEventMapper;
     private final UserPreferenceProfileMapper userPreferenceProfileMapper;
+    private final DailyRecommendationMapper dailyRecommendationMapper;
     private final ObjectMapper objectMapper;
     private final SearchProperties searchProperties;
     private final RecipeSearchService recipeSearchService;
     private final ApplicationEventPublisher applicationEventPublisher;
+    private final Map<Integer, CategoryRealtimePool> categoryRealtimePoolCache = new ConcurrentHashMap<>();
 
     @Override
     public PageResult<RecipeListDTO> getRecipeList(int page, int pageSize, Integer category, String difficulty,
@@ -154,7 +163,7 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     public PageResult<RecipeListDTO> searchRecipes(String keyword, String sort, int page, int pageSize) {
-        if (searchProperties.useElasticsearch()) {
+        if (recipeSearchService.shouldUseElasticsearch()) {
             try {
                 return recipeSearchService.searchRecipes(keyword, sort, page, pageSize);
             } catch (Exception e) {
@@ -183,7 +192,7 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     public List<SearchSuggestionDTO> getSearchSuggestions(String keyword, int limit) {
-        if (searchProperties.useElasticsearch()) {
+        if (recipeSearchService.shouldUseElasticsearch()) {
             try {
                 return recipeSearchService.getSearchSuggestions(keyword, limit);
             } catch (Exception e) {
@@ -215,6 +224,13 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
+    @Cacheable(value = "recommend_categories", key = "#limit", unless = "#result == null")
+    public List<Category> getRecommendCategories(int limit) {
+        int safeLimit = Math.min(Math.max(limit, 1), 10);
+        return categoryMapper.findTopRecommendCategories(safeLimit);
+    }
+
+    @Override
     public RecommendResponse getRecommendations(int limit, Integer userId) {
         return getRecommendationsByType("personal", limit, userId, null, null);
     }
@@ -230,7 +246,12 @@ public class RecipeServiceImpl implements RecipeService {
     }
 
     @Override
-    @Cacheable(value = "recommendations", key = "#type + '_' + #limit + '_' + (#userId == null ? 'anon' : #userId) + '_' + (#sceneCode == null ? 'all' : #sceneCode) + '_' + (#categoryId == null ? 'all' : #categoryId)", unless = "#result == null")
+    @Cacheable(
+            value = "recommendations",
+            key = "#type + '_' + #limit + '_' + (#userId == null ? 'anon' : #userId) + '_' + (#sceneCode == null ? 'all' : #sceneCode) + '_' + (#categoryId == null ? 'all' : #categoryId)",
+            condition = "#type != null && (#type.equalsIgnoreCase('hot') || #type.equalsIgnoreCase('new'))",
+            unless = "#result == null"
+    )
     public RecommendResponse getRecommendationsByType(String type, int limit, Integer userId, String sceneCode, Integer categoryId) {
         List<Recipe> recipes;
         String reason;
@@ -240,7 +261,42 @@ public class RecipeServiceImpl implements RecipeService {
         Integer normalizedCategoryId = normalizeCategoryId(categoryId);
         String selectedCategoryName = resolveCategoryName(normalizedCategoryId);
 
+        if (userId != null) {
+            if ("daily".equals(normalizedType)) {
+                RecommendResponse offlineResponse = getOfflineRankedRecommendations(safeLimit, userId, normalizedType);
+                if (offlineResponse != null) {
+                    return offlineResponse;
+                }
+            } else if ("personal".equals(normalizedType)) {
+                RecommendResponse blendedResponse = getBlendedPersonalRecommendations(
+                        safeLimit,
+                        userId,
+                        normalizedScene,
+                        normalizedCategoryId,
+                        selectedCategoryName);
+                if (blendedResponse != null) {
+                    return blendedResponse;
+                }
+            }
+        }
+
+        if ("personal".equals(normalizedType) && normalizedCategoryId != null) {
+            RecommendResponse response = new RecommendResponse();
+            response.setList(buildRealtimePersonalRecommendationList(
+                    safeLimit,
+                    userId,
+                    normalizedScene,
+                    normalizedCategoryId,
+                    selectedCategoryName));
+            response.setReason(buildResponseReason(normalizedScene, selectedCategoryName, "根据你的偏好推荐"));
+            return response;
+        }
+
         switch (normalizedType) {
+            case "daily":
+                recipes = collectPersonalCandidates(safeLimit * 3, normalizedCategoryId);
+                reason = "今日推荐暂未生成，已切换为实时推荐";
+                break;
             case "hot":
                 recipes = recipeMapper.findByCondition(normalizedCategoryId, null, null, "hot", 0, safeLimit);
                 reason = "热门推荐";
@@ -276,6 +332,232 @@ public class RecipeServiceImpl implements RecipeService {
         response.setList(list);
         response.setReason(buildResponseReason(normalizedScene, selectedCategoryName, reason));
         return response;
+    }
+
+    private RecommendResponse getBlendedPersonalRecommendations(int limit,
+            Integer userId,
+            String normalizedScene,
+            Integer normalizedCategoryId,
+            String selectedCategoryName) {
+        List<RecipeListDTO> offlineTop100 = getOfflineRankedRecommendationList(100, userId);
+        if (offlineTop100 == null || offlineTop100.isEmpty()) {
+            return null;
+        }
+        List<RecipeListDTO> offlineList = offlineTop100.stream()
+                .limit(Math.min(Math.max(limit * 4, 24), offlineTop100.size()))
+                .toList();
+        Set<Integer> offlineTop100Ids = offlineTop100.stream()
+                .map(RecipeListDTO::getId)
+                .collect(Collectors.toSet());
+
+        List<RecipeListDTO> realtimeList = buildRealtimePersonalRecommendationList(
+                Math.max(limit * 6, 48),
+                userId,
+                normalizedScene,
+                normalizedCategoryId,
+                selectedCategoryName);
+
+        int realtimeQuota = limit / 2;
+        int offlineQuota = limit - realtimeQuota;
+        LinkedHashMap<Integer, RecipeListDTO> offlineSelected = new LinkedHashMap<>();
+        LinkedHashMap<Integer, RecipeListDTO> realtimeSelected = new LinkedHashMap<>();
+
+        appendRecommendationsRandomly(offlineSelected, offlineList, offlineQuota);
+        appendRecommendationsRandomly(realtimeSelected, realtimeList, realtimeQuota, offlineTop100Ids);
+
+        int totalSelected = offlineSelected.size() + realtimeSelected.size();
+        if (totalSelected < limit) {
+            appendRecommendationsRandomly(realtimeSelected, realtimeList, limit - totalSelected, offlineTop100Ids);
+        }
+        totalSelected = offlineSelected.size() + realtimeSelected.size();
+        if (totalSelected < limit) {
+            appendRecommendationsRandomly(offlineSelected, offlineList, limit - totalSelected, realtimeSelected.keySet());
+        }
+
+        List<RecipeListDTO> mixed = new ArrayList<>(offlineSelected.values());
+        mixed.addAll(realtimeSelected.values());
+        if (mixed.isEmpty()) {
+            return null;
+        }
+        Collections.shuffle(mixed);
+
+        RecommendResponse response = new RecommendResponse();
+        response.setList(mixed.stream().limit(limit).collect(Collectors.toList()));
+        response.setReason(buildResponseReason(normalizedScene, selectedCategoryName, "离线模型推荐 + 分类实时推荐"));
+        return response;
+    }
+
+    private List<RecipeListDTO> buildRealtimePersonalRecommendationList(int limit,
+            Integer userId,
+            String normalizedScene,
+            Integer normalizedCategoryId,
+            String selectedCategoryName) {
+        int safeLimit = Math.max(limit, 1);
+        if (normalizedCategoryId != null) {
+            return buildStrictCategoryRealtimeRecommendationList(safeLimit, normalizedCategoryId, selectedCategoryName);
+        }
+
+        List<Recipe> recipes = collectPersonalCandidates(
+                safeLimit * (StringUtils.hasText(normalizedScene) || normalizedCategoryId != null ? 12 : 3),
+                normalizedCategoryId);
+        List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(recipes);
+        applySceneTagsAndReasons(list, "personal", normalizedScene);
+
+        int rerankLimit = (StringUtils.hasText(normalizedScene) || StringUtils.hasText(selectedCategoryName))
+                ? safeLimit * 12
+                : safeLimit;
+        applyPersonalRerank(list, userId, normalizedScene, rerankLimit);
+        list = applySelection(list, normalizedScene, selectedCategoryName, safeLimit);
+        return supplementSelection(list, normalizedScene, normalizedCategoryId, selectedCategoryName, safeLimit);
+    }
+
+    private List<RecipeListDTO> buildStrictCategoryRealtimeRecommendationList(int limit,
+            Integer categoryId,
+            String categoryName) {
+        int safeLimit = Math.max(limit, 1);
+        List<Integer> candidateIds = getCategoryRealtimePoolIds(categoryId, Math.max(safeLimit * 8, 48));
+        if (candidateIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<Integer> shuffledIds = new ArrayList<>(candidateIds);
+        Collections.shuffle(shuffledIds);
+        List<Integer> selectedIds = shuffledIds.stream()
+                .limit(safeLimit)
+                .toList();
+        List<Recipe> recipes = recipeMapper.findByIds(selectedIds);
+        if (recipes == null || recipes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, Recipe> recipeMap = recipes.stream()
+                .collect(Collectors.toMap(Recipe::getId, Function.identity(), (left, right) -> left));
+        List<Recipe> orderedRecipes = selectedIds.stream()
+                .map(recipeMap::get)
+                .filter(recipe -> recipe != null)
+                .toList();
+        List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(orderedRecipes);
+        for (RecipeListDTO dto : list) {
+            List<String> reasons = new ArrayList<>();
+            reasons.add("属于你选择的分类：" + categoryName);
+            reasons.add("来自实时分类推荐");
+            dto.setReasons(reasons.stream().distinct().limit(2).collect(Collectors.toList()));
+        }
+        return list;
+    }
+
+    private List<Integer> getCategoryRealtimePoolIds(Integer categoryId, int requestedSize) {
+        int safeRequestedSize = Math.max(requestedSize, 1);
+        long now = System.currentTimeMillis();
+        CategoryRealtimePool cachedPool = categoryRealtimePoolCache.get(categoryId);
+        if (cachedPool != null
+                && cachedPool.expireAtMillis > now
+                && cachedPool.recipeIds.size() >= Math.min(safeRequestedSize, CATEGORY_REALTIME_POOL_SIZE)) {
+            return cachedPool.recipeIds;
+        }
+
+        int fetchSize = Math.max(safeRequestedSize, CATEGORY_REALTIME_POOL_SIZE);
+        List<Integer> recipeIds = recipeMapper.findHotIdsByCategory(categoryId, fetchSize);
+        List<Integer> safeRecipeIds = recipeIds == null ? List.of() : List.copyOf(recipeIds);
+        categoryRealtimePoolCache.put(categoryId,
+                new CategoryRealtimePool(safeRecipeIds, now + CATEGORY_REALTIME_POOL_TTL_MILLIS));
+        return safeRecipeIds;
+    }
+
+    private RecommendResponse getOfflineRankedRecommendations(int limit, Integer userId, String requestType) {
+        List<RecipeListDTO> list = getOfflineRankedRecommendationList(limit, userId);
+        if (list == null || list.isEmpty()) {
+            return null;
+        }
+
+        RecommendResponse response = new RecommendResponse();
+        response.setList(list);
+        response.setReason("daily".equals(requestType) ? "今日推荐" : "离线模型推荐");
+        return response;
+    }
+
+    private List<RecipeListDTO> getOfflineRankedRecommendationList(int limit, Integer userId) {
+        if (userId == null) {
+            return List.of();
+        }
+        int responseLimit = Math.min(Math.max(limit, 1), 100);
+        LocalDate businessDate = LocalDate.now(ZoneId.of("Asia/Shanghai"));
+        List<DailyRecipeRecommendation> recommendations = dailyRecommendationMapper.findTodayRankedByUser(
+                userId,
+                businessDate,
+                responseLimit
+        );
+        if (recommendations == null || recommendations.isEmpty()) {
+            return List.of();
+        }
+        List<Integer> recipeIds = recommendations.stream()
+                .map(DailyRecipeRecommendation::getRecipeId)
+                .toList();
+        List<Recipe> recipes = recipeMapper.findByIds(recipeIds);
+        if (recipes == null || recipes.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, Recipe> recipeMap = recipes.stream()
+                .collect(Collectors.toMap(Recipe::getId, Function.identity(), (left, right) -> left));
+        List<Recipe> orderedRecipes = new ArrayList<>();
+        for (DailyRecipeRecommendation recommendation : recommendations) {
+            Recipe recipe = recipeMap.get(recommendation.getRecipeId());
+            if (recipe != null) {
+                orderedRecipes.add(recipe);
+            }
+        }
+
+        List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(orderedRecipes);
+        applyDailyReasons(list, recommendations);
+        return list;
+    }
+
+    private void applyDailyReasons(List<RecipeListDTO> list, List<DailyRecipeRecommendation> recommendations) {
+        if (list == null || list.isEmpty() || recommendations == null || recommendations.isEmpty()) {
+            return;
+        }
+        Map<Integer, DailyRecipeRecommendation> recommendationMap = recommendations.stream()
+                .collect(Collectors.toMap(DailyRecipeRecommendation::getRecipeId, Function.identity(), (left, right) -> left));
+        for (RecipeListDTO dto : list) {
+            DailyRecipeRecommendation recommendation = recommendationMap.get(dto.getId());
+            if (recommendation == null || !StringUtils.hasText(recommendation.getReasonJson())) {
+                dto.setReasons(List.of("今日推荐"));
+                continue;
+            }
+            dto.setReasons(parseDailyReasons(recommendation.getReasonJson()));
+        }
+    }
+
+    private List<String> parseDailyReasons(String reasonJson) {
+        try {
+            Map<String, Object> payload = objectMapper.readValue(reasonJson, new TypeReference<Map<String, Object>>() {
+            });
+            LinkedHashSet<String> reasons = new LinkedHashSet<>();
+            Object mainReason = payload.get("main_reason");
+            if (mainReason instanceof String value && StringUtils.hasText(value)) {
+                reasons.add(value);
+            }
+            Object matchedTags = payload.get("matched_tags");
+            if (matchedTags instanceof List<?> tags) {
+                String joined = tags.stream()
+                        .filter(String.class::isInstance)
+                        .map(String.class::cast)
+                        .filter(StringUtils::hasText)
+                        .limit(3)
+                        .collect(Collectors.joining(" / "));
+                if (StringUtils.hasText(joined)) {
+                    reasons.add("关联标签：" + joined);
+                }
+            }
+            if (reasons.isEmpty()) {
+                reasons.add("今日推荐");
+            }
+            return reasons.stream().limit(2).toList();
+        } catch (Exception e) {
+            log.debug("解析日推理由失败：{}", e.getMessage());
+            return List.of("今日推荐");
+        }
     }
 
     @Override
@@ -657,6 +939,48 @@ public class RecipeServiceImpl implements RecipeService {
         return merged.values().stream().limit(safeLimit).collect(Collectors.toList());
     }
 
+    private void appendRecommendations(Map<Integer, RecipeListDTO> target, List<RecipeListDTO> source, int quota) {
+        appendRecommendations(target, source, quota, Set.of());
+    }
+
+    private void appendRecommendations(Map<Integer, RecipeListDTO> target,
+            List<RecipeListDTO> source,
+            int quota,
+            Set<Integer> excludedIds) {
+        if (quota <= 0 || source == null || source.isEmpty()) {
+            return;
+        }
+        int added = 0;
+        for (RecipeListDTO dto : source) {
+            if (dto.getId() == null || target.containsKey(dto.getId()) || excludedIds.contains(dto.getId())) {
+                continue;
+            }
+            target.put(dto.getId(), dto);
+            added++;
+            if (added >= quota) {
+                break;
+            }
+        }
+    }
+
+    private void appendRecommendationsRandomly(Map<Integer, RecipeListDTO> target,
+            List<RecipeListDTO> source,
+            int quota) {
+        appendRecommendationsRandomly(target, source, quota, Set.of());
+    }
+
+    private void appendRecommendationsRandomly(Map<Integer, RecipeListDTO> target,
+            List<RecipeListDTO> source,
+            int quota,
+            Set<Integer> excludedIds) {
+        if (quota <= 0 || source == null || source.isEmpty()) {
+            return;
+        }
+        List<RecipeListDTO> shuffled = new ArrayList<>(source);
+        Collections.shuffle(shuffled);
+        appendRecommendations(target, shuffled, quota, excludedIds);
+    }
+
     private String buildResponseReason(String normalizedScene, String categoryName, String defaultReason) {
         List<String> suffixes = new ArrayList<>();
         if (StringUtils.hasText(normalizedScene)) {
@@ -784,6 +1108,9 @@ public class RecipeServiceImpl implements RecipeService {
 
     private Integer normalizeCategoryId(Integer categoryId) {
         return categoryId != null && categoryId > 0 ? categoryId : null;
+    }
+
+    private record CategoryRealtimePool(List<Integer> recipeIds, long expireAtMillis) {
     }
 
     private String resolveCategoryName(Integer categoryId) {

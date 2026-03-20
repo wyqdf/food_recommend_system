@@ -2,6 +2,8 @@ import request from "@/utils/request";
 
 let categoriesCache = null;
 let categoriesCacheTime = 0;
+let recommendCategoriesCache = null;
+let recommendCategoriesCacheTime = 0;
 
 export const recipeApi = {
   getList(params) {
@@ -33,6 +35,17 @@ export const recipeApi = {
     categoriesCache = res.data;
     categoriesCacheTime = now;
     return res;
+  },
+
+  async getRecommendCategories(limit = 10) {
+    const now = Date.now();
+    if (recommendCategoriesCache && now - recommendCategoriesCacheTime < 600000) {
+      return { data: recommendCategoriesCache.slice(0, limit) };
+    }
+    const res = await request.get("/categories/recommend", { params: { limit } });
+    recommendCategoriesCache = Array.isArray(res.data) ? res.data : [];
+    recommendCategoriesCacheTime = now;
+    return { data: recommendCategoriesCache.slice(0, limit) };
   },
 
   getRecommend(params) {
