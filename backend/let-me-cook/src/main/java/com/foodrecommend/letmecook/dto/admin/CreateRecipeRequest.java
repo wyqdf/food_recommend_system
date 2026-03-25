@@ -1,0 +1,38 @@
+package com.foodrecommend.letmecook.dto.admin;
+
+import lombok.Data;
+import java.util.List;
+
+@Data
+public class CreateRecipeRequest {
+    private String title;
+    private String author;
+    private String authorUid;
+    private String image;
+    private String description;
+    private String tips;
+    private String cookware;
+    
+    private Integer tasteId;
+    private Integer techniqueId;
+    private Integer timeCostId;
+    private Integer difficultyId;
+    
+    private List<Integer> categoryIds;
+    private List<IngredientItem> ingredients;
+    private List<StepItem> steps;
+
+    @Data
+    public static class IngredientItem {
+        private Integer ingredientId;
+        private String type;
+        private String quantity;
+    }
+
+    @Data
+    public static class StepItem {
+        private Integer stepNumber;
+        private String description;
+        private String image;
+    }
+}

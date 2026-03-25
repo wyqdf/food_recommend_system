@@ -1,0 +1,11 @@
+images
+assets\images
+.env.docker
+.env.server
+food-server-images.tar
+.docs-search-index.json
+temp/
+frontend/node_modules/
+frontend/dist/
+dataset/
+

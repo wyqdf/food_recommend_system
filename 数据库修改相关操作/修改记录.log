@@ -1,0 +1,118 @@
+# 美食推荐系统 - 数据库修改记录
+
+## 2026-03-01 - 管理员功能数据库更新（已完成）
+
+### 修改目的
+支持管理员后台管理功能，包括用户管理、食谱管理、系统日志等功能。
+
+### 修改内容
+
+#### 1. users 表新增字段
+```sql
+-- 添加状态字段（用于禁用/启用用户）
+ALTER TABLE users ADD COLUMN status TINYINT DEFAULT 1 COMMENT '1:正常 0:禁用';
+
+-- 添加手机号字段
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+
+-- 添加最后登录时间字段
+ALTER TABLE users ADD COLUMN last_login_time DATETIME;
+```
+
+**说明**：
+- `status`: 用户状态控制，支持管理员禁用/启用用户功能
+- `phone`: 用户联系方式
+- `last_login_time`: 记录用户最后登录时间
+
+#### 2. 新增 admins 表（管理员表）
+```sql
+CREATE TABLE admins (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(100) NOT NULL UNIQUE,
+    password VARCHAR(255) NOT NULL,
+    email VARCHAR(100),
+    role VARCHAR(20) DEFAULT 'admin',
+    status TINYINT DEFAULT 1 COMMENT '1:启用 0:禁用',
+    last_login_time DATETIME,
+    last_login_ip VARCHAR(50),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='管理员表';
+```
+
+**字段说明**：
+- `role`: 管理员角色（super_admin/admin）
+- `status`: 管理员状态
+- `last_login_time/ip`: 最后登录信息
+
+#### 3. 新增 system_logs 表（系统日志表）
+```sql
+CREATE TABLE system_logs (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    admin_id INT,
+    operation VARCHAR(100) COMMENT '操作类型',
+    module VARCHAR(50) COMMENT '模块',
+    content TEXT COMMENT '操作内容',
+    ip VARCHAR(50),
+    user_agent VARCHAR(200),
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (admin_id) REFERENCES admins(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统日志表';
+```
+
+**用途**：记录管理员的所有操作日志，便于审计和追踪。
+
+#### 4. 新增索引
+```sql
+-- users 表索引
+CREATE INDEX idx_users_status ON users(status);
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_users_username ON users(username);
+
+-- system_logs 表索引
+CREATE INDEX idx_system_logs_admin ON system_logs(admin_id);
+CREATE INDEX idx_system_logs_module ON system_logs(module);
+CREATE INDEX idx_system_logs_time ON system_logs(create_time);
+```
+
+#### 5. 插入默认管理员账号
+```sql
+INSERT INTO admins (username, password, email, role, status) 
+VALUES ('admin', 'admin123', 'admin@example.com', 'super_admin', 1);
+```
+
+**默认账号信息**：
+- 用户名：admin
+- 密码：admin123（注意：生产环境需使用 BCrypt 加密）
+- 角色：super_admin
+
+### 修改原因
+根据《管理员 API 设计文档》要求，需要实现以下功能模块：
+1. 管理员认证模块（登录、获取信息、修改密码）
+2. 用户管理模块（增删改查、禁用/启用）
+3. 食谱管理模块（增删改查、审核）
+4. 分类管理模块
+5. 统计模块
+6. 系统日志模块
+
+### 相关文件
+- SQL 脚本：`backend/migration_admin_tables.sql`
+- 执行脚本：`backend/migrate-db.ps1`
+- 验证脚本：`backend/verify-db.ps1`
+- 设计文档：`backend/管理员 API 设计文档.md`
+
+### 执行结果
+✅ 所有表和索引创建成功
+✅ 默认管理员账号已插入
+✅ 数据库结构验证通过
+
+### 后续工作
+1. ✅ 前端管理员页面开发完成（含 Mock 数据）
+2. ⏳ 后端管理员 API 接口开发（5 个 Controller 类，26 个 API 接口）
+3. ⏳ 实现管理员登录认证（JWT Token）
+4. ⏳ 实现操作日志记录功能
+
+---
+
+## 2026-03-01 - 初始数据库结构
+（之前的数据库结构，包含 users、recipes、comments 等基础表）

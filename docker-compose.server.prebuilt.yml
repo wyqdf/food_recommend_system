@@ -1,0 +1,85 @@
+services:
+  elasticsearch:
+    build:
+      context: ./infra/elasticsearch
+      dockerfile: Dockerfile
+    image: food-elasticsearch:smartcn
+    container_name: food-elasticsearch
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      discovery.type: single-node
+      xpack.security.enabled: "false"
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:${ELASTICSEARCH_PORT:-9200}:9200"
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+
+  mysql:
+    image: mysql:8.0
+    container_name: food-mysql
+    restart: unless-stopped
+    environment:
+      TZ: Asia/Shanghai
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-food_recommend}
+      MYSQL_USER: ${MYSQL_USER:-food_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --default-time-zone=+08:00
+    ports:
+      - "127.0.0.1:${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/let-me-cook/src/main/resources/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./backend/let-me-cook/src/main/resources/data.sql:/docker-entrypoint-initdb.d/02-data.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    image: food-backend:local
+    container_name: food-backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_started
+    ports:
+      - "${BACKEND_PORT:-8081}:8081"
+    environment:
+      TZ: Asia/Shanghai
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-food_recommend}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-food_app}
+      DB_PASSWORD: ${MYSQL_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-mysql}
+      SPRING_ELASTICSEARCH_URIS: ${SPRING_ELASTICSEARCH_URIS:-http://elasticsearch:9200}
+      SEARCH_ES_INDEX_ALIAS: ${SEARCH_ES_INDEX_ALIAS:-recipes_search}
+      SEARCH_ES_INDEX_NAME: ${SEARCH_ES_INDEX_NAME:-recipes_search_v2}
+      SEARCH_ES_BATCH_SIZE: ${SEARCH_ES_BATCH_SIZE:-500}
+      SEARCH_ES_AUTO_CREATE_INDEX: ${SEARCH_ES_AUTO_CREATE_INDEX:-true}
+      ALIYUN_OSS_ENABLED: ${ALIYUN_OSS_ENABLED:-true}
+      ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-beijing.aliyuncs.com}
+      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID}
+      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET}
+      ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-recipe-images}
+
+  frontend:
+    image: food-frontend:local
+    container_name: food-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+
+volumes:
+  mysql_data:
+  elasticsearch_data:
