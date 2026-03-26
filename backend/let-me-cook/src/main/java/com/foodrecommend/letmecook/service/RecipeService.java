@@ -23,6 +23,8 @@ public interface RecipeService {
 
         List<Category> getCategories();
 
+        List<Category> getRecommendCategories(int limit);
+
         RecommendResponse getRecommendations(int limit, Integer userId);
 
         RecommendResponse getRecommendationsByType(String type, int limit, Integer userId);

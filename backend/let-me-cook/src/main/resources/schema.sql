@@ -213,6 +213,40 @@ CREATE TABLE IF NOT EXISTS cooking_sessions (
     FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户烹饪会话表';
 
+-- 每日推荐结果表
+CREATE TABLE IF NOT EXISTS daily_recipe_recommendations (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    biz_date DATE NOT NULL COMMENT '业务日期',
+    recipe_id INT NOT NULL,
+    rank_no INT NOT NULL COMMENT '当日排序位次',
+    selected_for_delivery TINYINT DEFAULT 0 COMMENT '是否入选当日固定16条',
+    model_score DECIMAL(16,8) DEFAULT 0 COMMENT '模型分数',
+    reason_json JSON NULL COMMENT '推荐理由JSON',
+    model_version VARCHAR(64) NOT NULL COMMENT '模型版本',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_daily_reco_user_date_rank (user_id, biz_date, rank_no),
+    UNIQUE KEY uk_daily_reco_user_date_recipe (user_id, biz_date, recipe_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日推荐结果表';
+
+-- 每日推荐任务执行记录表
+CREATE TABLE IF NOT EXISTS daily_recommend_job_runs (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    job_date DATE NOT NULL COMMENT '任务业务日期',
+    phase VARCHAR(32) NOT NULL COMMENT '任务阶段',
+    model_version VARCHAR(64) NOT NULL COMMENT '模型版本',
+    affected_users INT DEFAULT 0 COMMENT '影响用户数',
+    affected_recipes INT DEFAULT 0 COMMENT '影响食谱数',
+    status VARCHAR(20) NOT NULL DEFAULT 'running' COMMENT '任务状态',
+    error_message TEXT NULL COMMENT '错误信息',
+    started_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    finished_at DATETIME NULL,
+    KEY idx_daily_job_runs_date_phase (job_date, phase, status),
+    KEY idx_daily_job_runs_started (started_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='每日推荐任务执行记录表';
+
 -- ===================== ID映射表 =====================
 
 -- 用户ID映射表
@@ -264,6 +298,8 @@ CREATE INDEX idx_behavior_user_time_scene ON behavior_events(user_id, create_tim
 CREATE INDEX idx_cook_session_user_status_time ON cooking_sessions(user_id, status, last_active_time DESC);
 CREATE INDEX idx_cook_session_recipe_time ON cooking_sessions(recipe_id, started_at DESC);
 CREATE INDEX idx_cook_session_user_start_time ON cooking_sessions(user_id, started_at DESC);
+CREATE INDEX idx_daily_reco_user_date_delivery ON daily_recipe_recommendations(user_id, biz_date, selected_for_delivery, rank_no);
+CREATE INDEX idx_daily_reco_date_version ON daily_recipe_recommendations(biz_date, model_version);
 
 -- 菜谱 - 分类关联表索引（优化菜谱大全查询）
 CREATE INDEX idx_recipe_categories_composite ON recipe_categories(category_id, recipe_id);
@@ -503,17 +539,16 @@ FOR EACH ROW
 BEGIN
     -- 更新统计概览
     INSERT INTO statistics_overview (stat_date, total_comments)
-    VALUES (CURDATE(), (SELECT COUNT(*) FROM comments))
+    VALUES (CURDATE(), 1)
     ON DUPLICATE KEY UPDATE
-        total_comments = total_comments + 1,
-        update_time = NOW();
+        total_comments = total_comments + 1;
     
     -- 更新评论趋势
     INSERT INTO comment_trend_daily (stat_date, new_comments_count, total_comments)
-    VALUES (CURDATE(), 1, (SELECT COUNT(*) FROM comments))
+    VALUES (CURDATE(), 1, 1)
     ON DUPLICATE KEY UPDATE
         new_comments_count = new_comments_count + 1,
-        total_comments = VALUES(total_comments);
+        total_comments = total_comments + 1;
 END$$
 
 -- 互动新增触发器

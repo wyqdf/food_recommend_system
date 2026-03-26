@@ -8,4 +8,13 @@ temp/
 frontend/node_modules/
 frontend/dist/
 dataset/
+exports
+runtime_data/
+scripts/recommendation_daily/.venv/
+scripts/recommendation_daily/__pycache__/
+scripts/recommendation_daily/*.pyc
+local_top100_cke_full/cke_full_source/datasets/meishitianxia_v1/images/
+local_top100_cke_full/cke_full_source/datasets/meishitianxia_v1/text_data_cache.pkl
+local_top100_cke_full/cke_full_source/trained_model/
+local_top100_cke_full/knowledge_graph_source/reference_output/
 

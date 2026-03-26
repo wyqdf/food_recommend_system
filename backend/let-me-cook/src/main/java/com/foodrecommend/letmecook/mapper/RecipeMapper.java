@@ -110,6 +110,19 @@ public interface RecipeMapper {
 
         @Select({
                         "<script>",
+                        "SELECT r.id",
+                        "FROM recipe_categories rc",
+                        "INNER JOIN recipes r ON r.id = rc.recipe_id",
+                        "WHERE rc.category_id = #{categoryId}",
+                        "AND r.status = 1",
+                        "ORDER BY r.like_count DESC, r.id DESC",
+                        "LIMIT #{limit}",
+                        "</script>"
+        })
+        List<Integer> findHotIdsByCategory(@Param("categoryId") Integer categoryId, @Param("limit") int limit);
+
+        @Select({
+                        "<script>",
                         "SELECT r.*,",
                         "d.name as difficultyName,",
                         "tc.name as timeCostName,",

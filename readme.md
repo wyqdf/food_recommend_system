@@ -7,6 +7,7 @@
 - Spring Boot 后端
 - MySQL 数据库
 - 可选的 Elasticsearch 搜索
+- 离线 Top100 推荐脚本与模型清单
 
 ## 先看这两个文档
 
@@ -49,10 +50,36 @@ foodrec/
 ├── docs/                                # 专题文档
 ├── infra/elasticsearch/                 # ES smartcn 镜像
 ├── scripts/                             # 辅助脚本
+├── local_top100_cke_full/               # 离线 Top100 说明、模型清单与轻量源码入口（大文件不进普通 Git）
 ├── agent.md                             # 项目交接总文档
 ├── 快速启动指南.md                       # 本地启动文档
 └── docker-compose.yml                   # ES / 前后端容器编排
 ```
+
+## 当前离线推荐口径
+
+仓库现在已经内置了本地离线 `Top100` 推荐所需的源码、映射和模型清单：
+
+- `local_top100_cke_full/cke_full_source/`
+- `local_top100_cke_full/knowledge_graph_source/`
+- `local_top100_cke_full/selected_model_manifest.json`
+
+说明：
+
+- 普通 Git 会保留源码、映射文件、图谱脚本和模型清单
+- 大型模型权重、缓存和运行工件不随普通 Git 推送，需要单独同步
+
+当前默认使用历史最优 `CKEFull` 模型为映射用户生成 `Top100`，结果写入数据库后：
+
+- `GET /api/recipes/recommend?type=personal`
+- `GET /api/recipes/recommend?type=daily`
+
+都会优先读取这批离线结果；没有命中离线结果的用户则回退到原有实时推荐。
+
+当前推荐页还有两条补充口径：
+
+- `personal` 已改成“离线 `Top100` + 实时推荐”混合返回，其中约 `50%` 来自实时推荐链路
+- 推荐页分类筛选改成读取后端前 10 热门分类，来源于 `GET /api/categories/recommend?limit=10`
 
 ## 5 分钟本地跑起来
 
@@ -90,6 +117,20 @@ mysql -uroot -p food_recommend < food_recommend.sql
 ```
 
 如果分享包里的文件名不是 `food_recommend.sql`，把上面的文件名替换成实际文件名即可。
+
+如果导入的是较旧备份，还要补执行当前仓库内的增量数据库补丁：
+
+```bash
+mysql -uroot -p food_recommend < backend/let-me-cook/src/main/resources/db/migration/V6__daily_recommendation_comment_patch.sql
+```
+
+这份补丁会补齐：
+
+- `daily_recipe_recommendations`
+- `daily_recommend_job_runs`
+- 各属性表 `recipe_count` 字段和索引
+- 评论性能相关索引
+- 评论插入触发器的增量统计逻辑
 
 如果你更习惯图形界面，也可以用 Navicat / DataGrip / MySQL Workbench 直接导入整库备份。
 
@@ -232,8 +273,8 @@ mvn spring-boot:run
 2. 根目录不是独立的管理端项目
    用户端和管理端都在 `frontend/`。
 
-3. 默认搜索引擎仍是 `mysql`
-   这能保证你不启动 ES 也能先跑起来。
+3. 默认搜索引擎是 `auto`
+   ES 可用时自动走 Elasticsearch，不可用时自动回退 MySQL。
 
 4. 前端默认端口不是 `5173`
    `npm run dev` 默认是 `3000`；`5173` 是当前团队常用的 Docker 前端演示端口。

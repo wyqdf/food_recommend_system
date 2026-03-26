@@ -57,8 +57,6 @@ import { Star, TrendCharts, Clock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { trackBehavior } from '@/utils/tracker'
 
-const RECOMMEND_CATEGORY_NAMES = ['家常菜', '快手菜', '减肥瘦身', '宴客菜', '夜宵', '下饭菜', '儿童', '早餐']
-
 const activeTab = ref('personal')
 const recipeList = ref([])
 const loading = ref(false)
@@ -76,12 +74,8 @@ const categorySegmentOptions = computed(() => {
 
 const loadCategories = async () => {
   try {
-    const res = await recipeApi.getCategories()
-    const source = Array.isArray(res.data) ? res.data : []
-    const orderMap = new Map(RECOMMEND_CATEGORY_NAMES.map((name, index) => [name, index]))
-    categoryOptions.value = source
-      .filter(item => item?.name && orderMap.has(item.name))
-      .sort((a, b) => orderMap.get(a.name) - orderMap.get(b.name))
+    const res = await recipeApi.getRecommendCategories(10)
+    categoryOptions.value = Array.isArray(res.data) ? res.data : []
   } catch (error) {
     categoryOptions.value = []
   }
@@ -90,7 +84,8 @@ const loadCategories = async () => {
 const fetchRecommend = async () => {
   const categoryKey = activeTab.value === 'personal' ? selectedCategoryId.value || 'all' : 'all'
   const cacheKey = `${activeTab.value}_${categoryKey}_12`
-  if (cache.has(cacheKey)) {
+  const shouldUseCache = activeTab.value !== 'personal'
+  if (shouldUseCache && cache.has(cacheKey)) {
     recipeList.value = cache.get(cacheKey)
     return
   }
@@ -103,7 +98,9 @@ const fetchRecommend = async () => {
     }
     const res = await recipeApi.getRecommend(params)
     recipeList.value = res.data.list || []
-    cache.set(cacheKey, recipeList.value)
+    if (shouldUseCache) {
+      cache.set(cacheKey, recipeList.value)
+    }
     const selectedCategoryName = categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
     trackBehavior('recommend_request', {
       sourcePage: 'recommend',

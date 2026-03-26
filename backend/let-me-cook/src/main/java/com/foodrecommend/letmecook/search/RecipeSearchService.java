@@ -102,6 +102,24 @@ public class RecipeSearchService {
         return new PageResult<>(list, total, safePage, safePageSize);
     }
 
+    public boolean shouldUseElasticsearch() {
+        if (searchProperties.isMysql()) {
+            return false;
+        }
+        try {
+            ensureIndexReady();
+            ensureV2ReadReady();
+            return true;
+        } catch (Exception e) {
+            log.debug("ES 当前不可读，回退 MySQL：{}", e.getMessage());
+            return false;
+        }
+    }
+
+    public String getActiveEngine() {
+        return shouldUseElasticsearch() ? "elasticsearch" : "mysql";
+    }
+
     public List<SearchSuggestionDTO> getSearchSuggestions(String keyword, int limit) {
         String normalizedKeyword = normalizeKeyword(keyword);
         if (!StringUtils.hasText(normalizedKeyword)) {
@@ -248,6 +266,7 @@ public class RecipeSearchService {
                 return;
             }
             createIndexIfMissing(targetIndex());
+            bindAliasToTargetIfMissingAndPopulated();
             indexReady = true;
             clearLastSyncError();
         } catch (Exception e) {
@@ -523,6 +542,23 @@ public class RecipeSearchService {
             return null;
         }
         return performRequest("GET", "/_alias/" + indexAlias(), null);
+    }
+
+    private void bindAliasToTargetIfMissingAndPopulated() throws IOException {
+        JsonNode aliasRoot = getAliasRoot();
+        if (aliasRoot != null) {
+            return;
+        }
+        if (getIndexDocumentCount(targetIndex()) <= 0) {
+            return;
+        }
+        log.info("检测到 ES 目标索引 {} 已有数据且别名 {} 缺失，自动绑定别名。", targetIndex(), indexAlias());
+        swapAliasToTargetIndex();
+    }
+
+    private long getIndexDocumentCount(String indexName) throws IOException {
+        JsonNode root = performRequest("GET", "/" + indexName + "/_count", null);
+        return root.path("count").asLong(0L);
     }
 
     private JsonNode executeSearch(Map<String, Object> payload) {

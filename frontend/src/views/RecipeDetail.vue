@@ -350,10 +350,29 @@ const submitComment = async () => {
   }
   submitting.value = true
   try {
-    await commentApi.add({ recipeId: recipe.value.id, content: commentContent.value })
+    const content = commentContent.value.trim()
+    const res = await commentApi.add({ recipeId: recipe.value.id, content })
+    const createdComment = {
+      id: res.data?.id,
+      recipeId: res.data?.recipeId ?? recipe.value.id,
+      userId: res.data?.userId ?? userStore.userInfo?.id,
+      content: res.data?.content ?? content,
+      publishTime: res.data?.publishTime ?? new Date().toISOString(),
+      likes: res.data?.likes ?? 0,
+      username: res.data?.username || userStore.userInfo?.username || userStore.userInfo?.nickname || '我',
+      avatar: res.data?.avatar || userStore.userInfo?.avatar || '',
+      isLiked: false
+    }
+    commentPage.value = 1
+    comments.value = [createdComment, ...comments.value.filter(item => item.id !== createdComment.id)]
+      .slice(0, commentPageSize.value)
+    commentTotal.value += 1
+    if (recipe.value) {
+      recipe.value.replyCount = (recipe.value.replyCount || 0) + 1
+    }
     ElMessage.success('评论成功')
     commentContent.value = ''
-    fetchComments()
+    void fetchComments({ silent: true })
   } finally {
     submitting.value = false
   }

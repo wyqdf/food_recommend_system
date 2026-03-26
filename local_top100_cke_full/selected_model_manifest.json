@@ -1,0 +1,38 @@
+{
+  "created_at": "2026-03-20T21:10:00+08:00",
+  "bundle_root": "F:\\Desktop\\大创\\foodrec\\local_top100_cke_full",
+  "model_family": "CKEFull",
+  "dataset_name": "meishitianxia_v1",
+  "dataset_dir": "F:\\Desktop\\大创\\foodrec\\local_top100_cke_full\\cke_full_source\\datasets\\meishitianxia_v1",
+  "model_path": "F:\\Desktop\\大创\\foodrec\\local_top100_cke_full\\cke_full_source\\trained_model\\CKEFull\\meishitianxia_v1\\embed-dim64_relation-dim32_vocab2000_lr1e-05_pretrain2\\model_epoch0030.pt",
+  "train_log_path": "F:\\Desktop\\大创\\foodrec\\local_top100_cke_full\\cke_full_source\\trained_model\\CKEFull\\meishitianxia_v1\\embed-dim64_relation-dim32_vocab2000_lr1e-05_pretrain2\\train.log",
+  "internal_counts": {
+    "n_users": 5461,
+    "n_items": 24572,
+    "n_entities": 30784,
+    "n_relations": 28
+  },
+  "mapping_alignment": {
+    "mapped_users": 5460,
+    "mapped_items": 24572,
+    "skipped_old_user_ids": [
+      0
+    ]
+  },
+  "latest_use_existing_model_result": {
+    "biz_date": "2026-03-20",
+    "affected_users": 5460,
+    "written_rows": 546000,
+    "selected_for_delivery_rows": 87360,
+    "affected_recipes": 19544,
+    "metrics": {
+      "precision@100": 0.013953487388789654,
+      "recall@100": 0.08817850053310394,
+      "ndcg@100": 0.04937573631578799
+    }
+  },
+  "notes": [
+    "This bundle is the preferred in-repo source for offline Top100 generation.",
+    "The backend reads the generated rows from daily_recipe_recommendations and does not run training."
+  ]
+}

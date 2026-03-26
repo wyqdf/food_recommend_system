@@ -154,7 +154,7 @@ public class RecipeSearchReindexService {
     }
 
     private void fillBaseStatus(SearchReindexStatusDTO target) {
-        target.setEngine(searchProperties.getEngine());
+        target.setEngine(recipeSearchService.getActiveEngine());
         target.setIndexAlias(searchProperties.getEs().getIndexAlias());
         target.setIndexName(searchProperties.getEs().getIndexName());
         target.setCurrentIndex(recipeSearchService.getCurrentIndexName());

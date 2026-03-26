@@ -30,7 +30,7 @@ services:
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-root}
       DB_PASSWORD: ${DB_PASSWORD:-123456}
       JWT_SECRET: ${JWT_SECRET:-letMeCookSecretKey2024FoodRecommendationSystem}
-      SEARCH_ENGINE: ${SEARCH_ENGINE:-mysql}
+      SEARCH_ENGINE: ${SEARCH_ENGINE:-auto}
       SPRING_ELASTICSEARCH_URIS: ${SPRING_ELASTICSEARCH_URIS:-http://elasticsearch:9200}
       SEARCH_ES_INDEX_ALIAS: ${SEARCH_ES_INDEX_ALIAS:-recipes_search}
       SEARCH_ES_INDEX_NAME: ${SEARCH_ES_INDEX_NAME:-recipes_search_v2}

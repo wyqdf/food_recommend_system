@@ -1,10 +1,10 @@
 # 美食推荐系统 - 文档中心
 
 > **版本**: v3.5
-> **最后更新**: 2026-03-19 18:18:00
+> **最后更新**: 2026-03-20 21:40:00
 > **维护原则**: 以仓库代码、`schema.sql`、运行日志与当前 API 返回为准
 
-> **启动提示**: 第一次本地跑项目时，优先导入完整的 `food_recommend` 数据库备份；`schema.sql + data.sql` 作为兜底初始化方案。
+> **启动提示**: 第一次本地跑项目时，优先导入完整的 `food_recommend` 数据库备份；若备份版本偏旧，再补执行 `backend/let-me-cook/src/main/resources/db/migration/V6__daily_recommendation_comment_patch.sql`；`schema.sql + data.sql` 作为兜底初始化方案。
 
 ## 项目概况
 
@@ -70,7 +70,9 @@ docs/
 - 前端默认开发端口来自 [vite.config.js](../frontend/vite.config.js) 的 `3000`；若本地用命令行显式指定 `5173`，以实际启动端口为准。
 - 后端默认端口为 `8081`，见 [application.properties](../backend/let-me-cook/src/main/resources/application.properties)。
 - 本地默认关闭 OSS：`aliyun.oss.enabled=false`。
-- 搜索引擎当前仓库默认值仍为 `search.engine=mysql`，用于保证首次部署安全；完成首轮 ES 建索引与重建后再切到 `elasticsearch`。
+- 搜索引擎当前仓库默认值已改为 `search.engine=auto`：
+  - ES 可用且索引/alias 就绪时自动使用 `elasticsearch`
+  - 否则自动回退 `mysql`
 - 本地已于 `2026-03-19 10:30` 完成 Search V2 验收：
   - `analysis-smartcn 8.12.2` 插件可用
   - 别名 `recipes_search` 当前指向 `recipes_search_v2`
@@ -79,6 +81,14 @@ docs/
 - 推荐页已于 `2026-03-19 13:07` 从“硬编码场景标签”切换为“现有分类筛选”：
   - 当前展示 `家常菜 / 快手菜 / 减肥瘦身 / 宴客菜 / 夜宵 / 下饭菜 / 儿童 / 早餐`
   - 对外接口为 `GET /api/recipes/recommend?type=personal&categoryId=<分类ID>`
+- 离线 Top100 推荐能力已于 `2026-03-20` 收口到仓库内：
+  - 仓库内保留脚本、说明和模型清单
+  - 大型数据集、模型权重和运行工件不随普通 Git 推送
+  - 当前默认使用 `CKEFull` 历史最优模型，不再使用 `CKEFullModify`
+  - 最近一次离线落库结果覆盖 `5460` 个映射用户，共写入 `546000` 条 `Top100`
+  - 后端当前对命中用户会优先读取这批离线结果：
+    - `GET /api/recipes/recommend?type=personal`
+    - `GET /api/recipes/recommend?type=daily`
 - `recipe_ingredients` 存在历史导入重复数据，统计层已做规避，但数据层清洗仍是后续重点任务。
 
 ## 文档同步约定

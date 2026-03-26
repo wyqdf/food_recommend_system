@@ -17,7 +17,7 @@ public class RecipeSearchIndexInitializer {
 
     @EventListener(ApplicationReadyEvent.class)
     public void initializeSearchIndex() {
-        if (!searchProperties.getEs().isAutoCreateIndex()) {
+        if (searchProperties.isMysql() || !searchProperties.getEs().isAutoCreateIndex()) {
             return;
         }
         try {

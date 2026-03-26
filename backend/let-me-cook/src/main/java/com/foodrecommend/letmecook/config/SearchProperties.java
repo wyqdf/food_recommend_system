@@ -9,10 +9,22 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "search")
 public class SearchProperties {
 
-    private String engine = "mysql";
+    private String engine = "auto";
     private final Es es = new Es();
 
     public boolean useElasticsearch() {
+        return !"mysql".equalsIgnoreCase(engine);
+    }
+
+    public boolean isAuto() {
+        return "auto".equalsIgnoreCase(engine);
+    }
+
+    public boolean isMysql() {
+        return "mysql".equalsIgnoreCase(engine);
+    }
+
+    public boolean isElasticsearch() {
         return "elasticsearch".equalsIgnoreCase(engine);
     }
 

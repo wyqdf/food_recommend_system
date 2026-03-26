@@ -7,6 +7,7 @@ import com.foodrecommend.letmecook.entity.Comment;
 import com.foodrecommend.letmecook.service.CommentService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -15,6 +16,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/comments")
 @RequiredArgsConstructor
+@Slf4j
 public class CommentController {
     
     private final CommentService commentService;
@@ -51,12 +53,18 @@ public class CommentController {
             Map<String, Object> data = new HashMap<>();
             data.put("id", comment.getId());
             data.put("recipeId", comment.getRecipeId());
+            data.put("userId", comment.getUserId());
             data.put("content", comment.getContent());
-            data.put("time", comment.getPublishTime());
+            data.put("publishTime", comment.getPublishTime());
+            data.put("likes", comment.getLikes());
+            data.put("username", comment.getUsername());
+            data.put("avatar", comment.getAvatar());
+            data.put("isLiked", comment.getIsLiked());
             
             return Result.success(data, "评论成功");
         } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
+            log.error("发表评论失败，recipeId={}, error={}", request.getRecipeId(), e.getMessage(), e);
+            return Result.error(500, "评论提交失败，请稍后重试");
         }
     }
     
@@ -72,7 +80,8 @@ public class CommentController {
             commentService.likeComment(userId, commentId);
               return Result.success(null, "点赞成功");
           } catch (Exception e) {
-              return Result.error(401, "登录已过期，请重新登录");
+              log.error("评论点赞失败，commentId={}, error={}", commentId, e.getMessage(), e);
+              return Result.error(500, "评论点赞失败，请稍后重试");
           }
       }
 }
