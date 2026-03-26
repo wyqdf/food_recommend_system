@@ -120,7 +120,7 @@ const handleRegister = async () => {
   loading.value = true
   try {
     await userStore.register(form)
-    ElMessage.success('注册成功，请登录')
+    ElMessage.success('注册成功，首次登录后可选择兴趣标签')
     router.push('/login')
   } catch (e) {
     console.error(e)
@@ -336,3 +336,4 @@ const handleRegister = async () => {
   }
 }
 </style>
+
