@@ -71,7 +71,7 @@
                     <el-dropdown-item @click="openOnboarding">
                       <el-icon>
                         <EditPen />
-                      </el-icon>偏好问卷
+                      </el-icon>兴趣标签
                     </el-dropdown-item>
                     <el-dropdown-item @click="$router.push('/user')">
                       <el-icon>
@@ -690,3 +690,4 @@ watch(() => userStore.user, (user) => {
   }
 }
 </style>
+
