@@ -28,7 +28,7 @@
                                 <el-icon>
                                     <DocumentAdd />
                                 </el-icon>
-                                创建我的菜谱
+                                发布我的菜谱
                             </el-button>
                         </router-link>
                     </div>
@@ -96,7 +96,8 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRouter } from 'vue-router'
 import { Dish, Bowl, Coffee, ArrowRight, KnifeFork, IceCream, Grid, DocumentAdd } from '@element-plus/icons-vue'
 import { recipeApi } from '@/api'
@@ -104,8 +105,11 @@ import RecipeGrid from '@/components/RecipeGrid.vue'
 import SearchEntry from '@/components/SearchEntry.vue'
 import { trackBehavior } from '@/utils/tracker'
 import { SEARCH_HOT_KEYWORDS, addSearchHistory } from '@/utils/search'
+import { useSceneModeStore } from '@/stores/sceneMode'
 
 const router = useRouter()
+const sceneModeStore = useSceneModeStore()
+const { currentMode } = storeToRefs(sceneModeStore)
 const keyword = ref('')
 const categories = ref([])
 const recommendList = ref([])
@@ -128,17 +132,6 @@ const categoryColors = [
 
 const getCategoryIcon = (index) => categoryIcons[index % categoryIcons.length]
 const getCategoryColor = (index) => categoryColors[index % categoryColors.length]
-
-const shuffleArray = (items) => {
-    const next = Array.isArray(items) ? [...items] : []
-    for (let i = next.length - 1; i > 0; i -= 1) {
-        const j = Math.floor(Math.random() * (i + 1))
-        const temp = next[i]
-        next[i] = next[j]
-        next[j] = temp
-    }
-    return next
-}
 
 const handleSearchSubmit = ({ keyword: nextKeyword }) => {
     router.push({ path: '/search', query: { keyword: nextKeyword } })
@@ -166,12 +159,12 @@ const loadData = async () => {
     try {
         const [catRes, recRes, hotRes] = await Promise.all([
             recipeApi.getRecommendCategories(8),
-            recipeApi.getRecommend({ type: 'personal', limit: 8 }),
-            recipeApi.getList({ sort: 'hot', page: 1, pageSize: 48 })
+            recipeApi.getRecommend({ type: 'personal', limit: 8, mode: currentMode.value }),
+            recipeApi.getList({ sort: 'hot', page: 1, pageSize: 8, mode: currentMode.value })
         ])
         categories.value = Array.isArray(catRes.data) ? catRes.data.slice(0, 8) : []
         recommendList.value = recRes.data.list || []
-        hotList.value = shuffleArray(hotRes.data.list || []).slice(0, 8)
+        hotList.value = hotRes.data.list || []
     } catch (error) {
         console.error('加载失败:', error)
     } finally {
@@ -179,8 +172,16 @@ const loadData = async () => {
     }
 }
 
+watch(currentMode, async (mode, previousMode) => {
+    await loadData()
+    trackBehavior('scene_mode_change', {
+        sourcePage: 'home',
+        extra: { mode, previousMode }
+    })
+})
+
 onMounted(async () => {
-    trackBehavior('page_view', { sourcePage: 'home' })
+    trackBehavior('page_view', { sourcePage: 'home', extra: { mode: currentMode.value } })
     await loadData()
 })
 </script>
@@ -194,10 +195,11 @@ onMounted(async () => {
     position: relative;
     text-align: center;
     padding: 64px 34px;
-    background: linear-gradient(135deg, #ff6b6b 0%, #ff8e8e 50%, #ffa8a8 100%);
+    background: var(--hero-gradient);
     border-radius: var(--radius-lg);
     margin-bottom: 38px;
     overflow: hidden;
+    transition: background 0.6s ease, box-shadow var(--transition);
 }
 
 .hero-content {

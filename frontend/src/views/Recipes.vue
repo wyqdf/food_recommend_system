@@ -2,7 +2,7 @@
   <div class="recipes-page container page-shell">
     <div class="page-header">
       <h2>菜谱大全</h2>
-      <p>探索美味，发现精彩</p>
+      <p>按分类、难度与场景模式快速找到更合适的菜谱</p>
     </div>
 
     <div class="filter-bar">
@@ -30,23 +30,35 @@
       </div>
     </div>
 
-    <RecipeGrid :recipes="recipeList" :loading="loading" />
+    <transition name="mode-fade" mode="out-in">
+      <RecipeGrid :key="gridKey" :recipes="recipeList" :loading="loading" />
+    </transition>
 
     <div class="pagination-wrapper">
-      <el-pagination v-model:current-page="page" :page-size="pageSize" :total="total" layout="prev, pager, next"
-        background @current-change="fetchRecipes" />
+      <el-pagination
+        v-model:current-page="page"
+        :page-size="pageSize"
+        :total="total"
+        layout="prev, pager, next"
+        background
+        @current-change="fetchRecipes"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
+import { useSceneModeStore } from '@/stores/sceneMode'
 
 const route = useRoute()
 const router = useRouter()
+const sceneModeStore = useSceneModeStore()
+const { currentMode } = storeToRefs(sceneModeStore)
 const categories = ref([])
 const recipeList = ref([])
 const loading = ref(false)
@@ -60,13 +72,16 @@ const filters = ref({
   sort: 'new'
 })
 
+const gridKey = computed(() => `${currentMode.value}_${filters.value.sort}_${filters.value.categoryId || 'all'}_${page.value}`)
+
 const fetchRecipes = async () => {
   loading.value = true
   try {
     const params = {
       page: page.value,
       pageSize: pageSize.value,
-      sort: filters.value.sort
+      sort: filters.value.sort,
+      mode: currentMode.value
     }
 
     if (filters.value.categoryId) {
@@ -86,6 +101,7 @@ const fetchRecipes = async () => {
 
 const handleCategoryChange = (value) => {
   filters.value.categoryId = value || ''
+  page.value = 1
   if (value) {
     router.push({ query: { ...route.query, category: value } })
   } else {
@@ -98,13 +114,14 @@ const handleCategoryChange = (value) => {
 watch(() => route.query.category, (newCategory, oldCategory) => {
   if (newCategory !== oldCategory) {
     page.value = 1
-    if (newCategory) {
-      filters.value.categoryId = newCategory
-    } else {
-      filters.value.categoryId = ''
-    }
+    filters.value.categoryId = newCategory || ''
     fetchRecipes()
   }
+})
+
+watch(currentMode, () => {
+  page.value = 1
+  fetchRecipes()
 })
 
 onMounted(async () => {
@@ -175,6 +192,17 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   margin-top: 26px;
+}
+
+.mode-fade-enter-active,
+.mode-fade-leave-active {
+  transition: opacity 0.24s ease, transform 0.24s ease;
+}
+
+.mode-fade-enter-from,
+.mode-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 @media (max-width: 768px) {

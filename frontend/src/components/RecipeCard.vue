@@ -11,14 +11,14 @@
         </template>
       </el-image>
       <div class="image-overlay">
-        <div v-if="recipe.difficultyName" class="difficulty-tag" :class="getDifficultyClass(recipe.difficultyName)">
-          {{ recipe.difficultyName }}
+        <div v-if="displayDifficulty" class="difficulty-tag" :class="getDifficultyClass(displayDifficulty)">
+          {{ displayDifficulty }}
         </div>
         <div class="time-tag">
           <el-icon>
             <Timer />
           </el-icon>
-          {{ recipe.timeCostName || '未知' }}
+          {{ displayTime }}
         </div>
       </div>
     </div>
@@ -59,6 +59,7 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Picture, Star, Timer, User, ChatDotRound, CollectionTag } from '@element-plus/icons-vue'
 import { trackBehavior } from '@/utils/tracker'
@@ -70,6 +71,8 @@ const props = defineProps({
 const router = useRouter()
 const route = useRoute()
 const defaultImage = '/images/food-placeholder.svg'
+const displayTime = computed(() => props.recipe.timeCostName || props.recipe.time || '未知')
+const displayDifficulty = computed(() => props.recipe.difficultyName || props.recipe.difficulty || '')
 
 const goDetail = () => {
   trackBehavior('recipe_click', {

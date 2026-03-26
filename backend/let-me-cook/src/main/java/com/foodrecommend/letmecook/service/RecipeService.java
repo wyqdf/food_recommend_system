@@ -10,10 +10,10 @@ public interface RecipeService {
 
         PageResult<RecipeListDTO> getRecipeList(int page, int pageSize, Integer category, String difficulty,
                         String time,
-                        String sort);
+                        String sort, String mode);
 
         PageResult<RecipeListDTO> getRecipeListCached(int page, int pageSize, Integer category, String difficulty,
-                        String time, String sort);
+                        String time, String sort, String mode);
 
         RecipeDetailDTO getRecipeDetail(Integer id);
 

@@ -7,6 +7,7 @@ import com.foodrecommend.letmecook.dto.*;
 import com.foodrecommend.letmecook.service.RecipeService;
 import com.foodrecommend.letmecook.util.AuthTokenHelper;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -28,10 +29,11 @@ public class RecipeController {
             @RequestParam(required = false) Integer category,
             @RequestParam(required = false) String difficulty,
             @RequestParam(required = false) String time,
-            @RequestParam(defaultValue = "new") String sort) {
+            @RequestParam(defaultValue = "new") String sort,
+            @RequestParam(required = false) String mode) {
 
         PageResult<RecipeListDTO> result = recipeService.getRecipeListCached(page, pageSize, category, difficulty, time,
-                sort);
+                sort, mode);
 
         return Result.success(ResponseDataBuilder.page(result));
     }
@@ -68,6 +70,7 @@ public class RecipeController {
             @RequestParam(defaultValue = "personal") String type,
             @RequestParam(defaultValue = "16") int limit,
             @RequestParam(required = false) String scene,
+            @RequestParam(required = false) String mode,
             @RequestParam(required = false) Integer categoryId,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
 
@@ -77,7 +80,9 @@ public class RecipeController {
         } catch (Exception ignored) {
             userId = null;
         }
-        RecommendResponse response = recipeService.getRecommendationsByType(type, limit, userId, scene, categoryId);
+        String resolvedScene = StringUtils.hasText(scene) ? scene : mapModeToScene(mode);
+        RecommendResponse response = recipeService.getRecommendationsByType(type, limit, userId, resolvedScene,
+                categoryId);
         return Result.success(response);
     }
 
@@ -95,5 +100,18 @@ public class RecipeController {
         Map<String, Object> data = new HashMap<>();
         data.put("id", recipeId);
         return Result.success(data);
+    }
+
+    private String mapModeToScene(String mode) {
+        if (!StringUtils.hasText(mode)) {
+            return null;
+        }
+        return switch (mode.trim().toLowerCase()) {
+            case "family" -> "family";
+            case "fitness" -> "diet";
+            case "quick" -> "quick";
+            case "party" -> "banquet";
+            default -> null;
+        };
     }
 }

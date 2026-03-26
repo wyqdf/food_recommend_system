@@ -68,10 +68,9 @@ public class RecipeServiceImpl implements RecipeService {
 
     @Override
     public PageResult<RecipeListDTO> getRecipeList(int page, int pageSize, Integer category, String difficulty,
-            String time, String sort) {
+            String time, String sort, String mode) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
-        int offset = (safePage - 1) * safePageSize;
         Integer difficultyId = resolveDifficultyId(difficulty);
         if (StringUtils.hasText(difficulty) && difficultyId == null) {
             return new PageResult<>(List.of(), 0, safePage, safePageSize);
@@ -82,19 +81,39 @@ public class RecipeServiceImpl implements RecipeService {
             return new PageResult<>(List.of(), 0, safePage, safePageSize);
         }
 
-        List<Recipe> recipes = recipeMapper.findByCondition(category, difficultyId, timeCostId, sort, offset, safePageSize);
+        String normalizedMode = normalizeMode(mode);
+        if (!StringUtils.hasText(normalizedMode)) {
+            int offset = (safePage - 1) * safePageSize;
+            List<Recipe> recipes = recipeMapper.findByCondition(category, difficultyId, timeCostId, sort, offset,
+                    safePageSize);
+            long total = recipeMapper.countByCondition(category, difficultyId, timeCostId);
+            List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(recipes);
+            return new PageResult<>(list, total, safePage, safePageSize);
+        }
+
         long total = recipeMapper.countByCondition(category, difficultyId, timeCostId);
+        if (total <= 0) {
+            return new PageResult<>(List.of(), 0, safePage, safePageSize);
+        }
 
-        List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(recipes);
+        int fetchSize = (int) Math.min(Math.max(total, (long) safePage * safePageSize), 5000L);
+        List<Recipe> candidates = recipeMapper.findByCondition(category, difficultyId, timeCostId, sort, 0, fetchSize);
+        List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(candidates);
+        String sceneCode = mapModeToSceneCode(normalizedMode);
+        applySceneTagsAndReasons(list, "personal", sceneCode);
+        list = rerankBySceneMode(list, normalizedMode, sceneCode);
 
-        return new PageResult<>(list, total, safePage, safePageSize);
+        int from = Math.min((safePage - 1) * safePageSize, list.size());
+        int to = Math.min(from + safePageSize, list.size());
+        List<RecipeListDTO> pageList = new ArrayList<>(list.subList(from, to));
+        return new PageResult<>(pageList, list.size(), safePage, safePageSize);
     }
 
     @Override
-    @Cacheable(value = "recipe_list", key = "#page + '_' + #pageSize + '_' + (#category ?: 'all') + '_' + (#difficulty ?: 'all') + '_' + (#time ?: 'all') + '_' + (#sort ?: 'new')", unless = "#result == null")
+    @Cacheable(value = "recipe_list", key = "#page + '_' + #pageSize + '_' + (#category ?: 'all') + '_' + (#difficulty ?: 'all') + '_' + (#time ?: 'all') + '_' + (#sort ?: 'new') + '_' + (#mode ?: 'all')", unless = "#result == null")
     public PageResult<RecipeListDTO> getRecipeListCached(int page, int pageSize, Integer category, String difficulty,
-            String time, String sort) {
-        return getRecipeList(page, pageSize, category, difficulty, time, sort);
+            String time, String sort, String mode) {
+        return getRecipeList(page, pageSize, category, difficulty, time, sort, mode);
     }
 
     @Override
@@ -1026,6 +1045,18 @@ public class RecipeServiceImpl implements RecipeService {
         return false;
     }
 
+    private boolean containsAny(String text, String... keys) {
+        if (!StringUtils.hasText(text)) {
+            return false;
+        }
+        for (String key : keys) {
+            if (text.contains(key)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean containsAny(List<String> values, String... keys) {
         if (values == null || values.isEmpty()) {
             return false;
@@ -1104,6 +1135,158 @@ public class RecipeServiceImpl implements RecipeService {
         }
         String code = sceneCode.trim().toLowerCase();
         return code.isEmpty() ? null : code;
+    }
+
+    private String normalizeMode(String mode) {
+        if (!StringUtils.hasText(mode)) {
+            return null;
+        }
+        String normalized = mode.trim().toLowerCase(Locale.ROOT);
+        return switch (normalized) {
+            case "family", "fitness", "quick", "party" -> normalized;
+            default -> null;
+        };
+    }
+
+    private String mapModeToSceneCode(String mode) {
+        if (!StringUtils.hasText(mode)) {
+            return null;
+        }
+        return switch (mode) {
+            case "family" -> "family";
+            case "fitness" -> "diet";
+            case "quick" -> "quick";
+            case "party" -> "banquet";
+            default -> null;
+        };
+    }
+
+    private List<RecipeListDTO> rerankBySceneMode(List<RecipeListDTO> list, String mode, String sceneCode) {
+        if (list == null || list.isEmpty()) {
+            return List.of();
+        }
+        List<RecipeListDTO> sorted = list.stream()
+                .sorted(Comparator
+                        .comparingDouble((RecipeListDTO item) -> sceneModeScore(item, mode, sceneCode)).reversed()
+                        .thenComparing(item -> item.getLikeCount() == null ? 0 : item.getLikeCount(),
+                                Comparator.reverseOrder()))
+                .collect(Collectors.toList());
+
+        if ("quick".equals(mode)) {
+            List<RecipeListDTO> quickFirst = sorted.stream()
+                    .filter(this::isQuickFriendlyByTime)
+                    .collect(Collectors.toList());
+            if (!quickFirst.isEmpty()) {
+                return quickFirst;
+            }
+        }
+        return sorted;
+    }
+
+    private double sceneModeScore(RecipeListDTO dto, String mode, String sceneCode) {
+        double score = 0;
+        String name = dto.getName() == null ? "" : dto.getName();
+        String time = dto.getTime() == null ? "" : dto.getTime();
+        String difficulty = dto.getDifficulty() == null ? "" : dto.getDifficulty();
+        String taste = dto.getTaste() == null ? "" : dto.getTaste();
+        List<String> categories = dto.getCategories() == null ? List.of() : dto.getCategories();
+        List<String> ingredients = dto.getIngredients() == null ? List.of() : dto.getIngredients();
+
+        if (StringUtils.hasText(sceneCode) && SceneTagResolver.matchesScene(dto, sceneCode)) {
+            score += 10;
+        }
+
+        switch (mode) {
+            case "family" -> {
+                if (containsAny(name, "家常", "家庭", "全家", "儿童", "下饭", "营养")) {
+                    score += 4;
+                }
+                if (containsAny(categories, "家常菜", "家庭餐", "儿童餐", "下饭菜", "汤")) {
+                    score += 4;
+                }
+                if (containsAny(ingredients, "鸡蛋", "番茄", "土豆", "豆腐", "青菜")) {
+                    score += 2;
+                }
+            }
+            case "fitness" -> {
+                if (containsAny(name, "减脂", "健身", "轻食", "低卡", "高蛋白", "沙拉")) {
+                    score += 5;
+                }
+                if (containsAny(categories, "减脂", "健身", "轻食", "沙拉", "低脂")) {
+                    score += 4;
+                }
+                if (containsAny(ingredients, "鸡胸", "鸡胸肉", "虾", "虾仁", "鱼", "西兰花", "蛋白", "豆腐", "燕麦")) {
+                    score += 4;
+                }
+                if (containsAny(taste, "清淡", "原味")) {
+                    score += 1;
+                }
+            }
+            case "quick" -> {
+                if (containsAny(time, "10", "15", "20")) {
+                    score += 5;
+                }
+                if (containsAny(difficulty, "简单")) {
+                    score += 2;
+                }
+                if (containsAny(name, "快手", "速食", "一人食", "便当", "懒人")) {
+                    score += 4;
+                }
+                if (containsAny(categories, "快手菜", "一人食", "便当", "早餐")) {
+                    score += 3;
+                }
+                if (!isQuickFriendlyByTime(dto)) {
+                    score -= 8;
+                }
+            }
+            case "party" -> {
+                if (containsAny(name, "聚会", "宴客", "硬菜", "甜点", "招待", "烘焙", "派对")) {
+                    score += 5;
+                }
+                if (containsAny(categories, "宴客菜", "聚会", "甜点", "烘焙", "下午茶")) {
+                    score += 4;
+                }
+                if (containsAny(difficulty, "高级")) {
+                    score += 2;
+                }
+            }
+            default -> {
+            }
+        }
+
+        score += Math.min(2.0, (dto.getLikeCount() == null ? 0 : dto.getLikeCount()) / 300.0);
+        return score;
+    }
+
+    private boolean isQuickFriendlyByTime(RecipeListDTO dto) {
+        if (dto == null || !StringUtils.hasText(dto.getTime())) {
+            return false;
+        }
+        String time = dto.getTime().replaceAll("\\s+", "");
+        if (time.contains("10") || time.contains("15") || time.contains("20")) {
+            return true;
+        }
+        Integer minutes = parseMinutes(time);
+        return minutes != null && minutes <= 20;
+    }
+
+    private Integer parseMinutes(String timeText) {
+        if (!StringUtils.hasText(timeText)) {
+            return null;
+        }
+        String text = timeText.trim();
+        try {
+            if (text.contains("小时")) {
+                int hour = Integer.parseInt(text.replaceAll("[^0-9]", ""));
+                return hour * 60;
+            }
+            if (text.contains("分钟") || text.contains("分")) {
+                return Integer.parseInt(text.replaceAll("[^0-9]", ""));
+            }
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
+        return null;
     }
 
     private Integer normalizeCategoryId(Integer categoryId) {

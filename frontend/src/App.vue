@@ -51,6 +51,9 @@
               管理后台
             </el-menu-item>
           </el-menu>
+          <div class="header-scene-mode">
+            <SceneModeTopNav />
+          </div>
           <div class="header-right">
             <div class="search-wrapper">
               <SearchEntry
@@ -181,6 +184,9 @@
             管理后台
           </el-menu-item>
         </el-menu>
+        <div class="mobile-scene-mode">
+          <SceneModeTopNav />
+        </div>
 
         <div class="mobile-user-panel">
           <template v-if="userStore.isLoggedIn">
@@ -215,16 +221,30 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Food, HomeFilled, Dish, Star, User, CollectionTag, SwitchButton, Setting, Menu, EditPen } from '@element-plus/icons-vue'
+import { useSceneModeStore } from '@/stores/sceneMode'
 import { useUserStore } from '@/stores/user'
 import OnboardingSurveyDialog from '@/components/OnboardingSurveyDialog.vue'
 import SearchEntry from '@/components/SearchEntry.vue'
+import SceneModeTopNav from '@/components/SceneModeTopNav.vue'
 
 const route = useRoute()
 const router = useRouter()
+const sceneModeStore = useSceneModeStore()
 const userStore = useUserStore()
 const searchKeyword = ref('')
 const mobileMenuVisible = ref(false)
 const showOnboardingDialog = ref(false)
+
+let hasAppliedSceneTheme = false
+const ensureSceneTheme = () => {
+  if (hasAppliedSceneTheme) return
+  sceneModeStore.initializeTheme()
+  hasAppliedSceneTheme = true
+}
+
+if (typeof window !== 'undefined') {
+  ensureSceneTheme()
+}
 
 const isAdminPage = computed(() => {
   return route.path.startsWith('/admin')
@@ -278,6 +298,7 @@ const handleLogout = () => {
 }
 
 onMounted(async () => {
+  ensureSceneTheme()
   if (!userStore.token) return
   await userStore.fetchProfile()
   if (userStore.user && userStore.user.onboardingCompleted === false) {
@@ -335,6 +356,7 @@ watch(() => userStore.user, (user) => {
   gap: 10px;
   cursor: pointer;
   transition: var(--transition);
+  flex-shrink: 0;
 }
 
 .logo:hover {
@@ -359,6 +381,9 @@ watch(() => userStore.user, (user) => {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  white-space: nowrap;
+  line-height: 1;
+  display: inline-block;
 }
 
 .nav-menu {
@@ -385,6 +410,10 @@ watch(() => userStore.user, (user) => {
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.header-scene-mode {
+  flex-shrink: 0;
 }
 
 .search-wrapper {
@@ -537,6 +566,16 @@ watch(() => userStore.user, (user) => {
   margin-bottom: 4px;
 }
 
+.mobile-scene-mode {
+  margin: 4px 0 12px;
+}
+
+.mobile-scene-mode :deep(.scene-top-nav) {
+  width: 100%;
+  flex-wrap: wrap;
+  border-radius: var(--radius-md);
+}
+
 .mobile-user-panel {
   margin-top: auto;
   padding-top: 14px;
@@ -608,6 +647,10 @@ watch(() => userStore.user, (user) => {
   }
 
   .nav-menu {
+    display: none;
+  }
+
+  .header-scene-mode {
     display: none;
   }
 

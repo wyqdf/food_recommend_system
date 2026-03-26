@@ -1,10 +1,15 @@
 package com.foodrecommend.letmecook.util;
 
-import com.foodrecommend.letmecook.dto.SceneTagDTO;
 import com.foodrecommend.letmecook.dto.RecipeListDTO;
+import com.foodrecommend.letmecook.dto.SceneTagDTO;
 import com.foodrecommend.letmecook.entity.Recipe;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 
 public final class SceneTagResolver {
 
@@ -12,11 +17,11 @@ public final class SceneTagResolver {
 
     static {
         SCENES.put("quick", new SceneTagDTO("quick", "快手", "20 分钟内可完成"));
-        SCENES.put("diet", new SceneTagDTO("diet", "减脂", "偏低卡、清爽、控油"));
+        SCENES.put("diet", new SceneTagDTO("diet", "减脂", "低卡清淡、蛋白优先"));
         SCENES.put("solo", new SceneTagDTO("solo", "一人食", "分量轻、流程简单"));
         SCENES.put("family", new SceneTagDTO("family", "家庭餐", "家常高频、适合多人"));
         SCENES.put("banquet", new SceneTagDTO("banquet", "宴客", "适合招待或聚会"));
-        SCENES.put("supper", new SceneTagDTO("supper", "夜宵", "操作快、口味集中"));
+        SCENES.put("supper", new SceneTagDTO("supper", "夜宵", "操作快、风味集中"));
         SCENES.put("baby", new SceneTagDTO("baby", "宝宝餐", "儿童/辅食相关"));
         SCENES.put("with_rice", new SceneTagDTO("with_rice", "下饭", "重口或酱香型下饭菜"));
     }
@@ -58,41 +63,44 @@ public final class SceneTagResolver {
     }
 
     public static List<String> resolveCodes(String title,
-                                            String difficulty,
-                                            String time,
-                                            List<String> categories,
-                                            List<String> ingredients,
-                                            String taste) {
+            String difficulty,
+            String time,
+            List<String> categories,
+            List<String> ingredients,
+            String taste) {
         Set<String> codes = new LinkedHashSet<>();
         String normalizedTitle = title == null ? "" : title;
         List<String> normalizedCategories = categories == null ? List.of() : categories;
         List<String> normalizedIngredients = ingredients == null ? List.of() : ingredients;
 
-        if (containsAny(time, "10", "15", "20", "半小时", "30分钟") || containsAny(difficulty, "简单")) {
+        if (containsAny(time, "10", "15", "20")) {
             codes.add("quick");
         }
         if (isDietRecipe(normalizedTitle, normalizedCategories, normalizedIngredients, taste)) {
             codes.add("diet");
         }
-        if (containsAny(normalizedTitle, "一人食", "单人")
-                || containsAnyList(normalizedCategories, "一人食")) {
+        if (containsAny(normalizedTitle, "一人食", "单人", "便当", "工作日")
+                || containsAnyList(normalizedCategories, "一人食", "便当", "快手菜")) {
             codes.add("solo");
         }
-        if (containsAny(normalizedTitle, "家常", "家庭")
-                || containsAnyList(normalizedCategories, "家常", "家庭")) {
+        if (containsAny(normalizedTitle, "家常", "家庭", "全家", "儿童")
+                || containsAnyList(normalizedCategories, "家常菜", "家庭餐", "儿童餐", "下饭菜")) {
             codes.add("family");
         }
-        if (containsAny(normalizedTitle, "宴客", "聚会", "硬菜", "招待")) {
+        if (containsAny(normalizedTitle, "宴客", "聚会", "硬菜", "招待", "派对")
+                || containsAnyList(normalizedCategories, "宴客菜", "聚会", "甜点", "烘焙")) {
             codes.add("banquet");
         }
-        if (containsAny(normalizedTitle, "夜宵", "宵夜")) {
+        if (containsAny(normalizedTitle, "夜宵", "宵夜")
+                || containsAnyList(normalizedCategories, "夜宵")) {
             codes.add("supper");
         }
         if (containsAny(normalizedTitle, "宝宝", "辅食", "儿童")
-                || containsAnyList(normalizedCategories, "宝宝餐", "辅食")) {
+                || containsAnyList(normalizedCategories, "宝宝餐", "辅食", "儿童餐")) {
             codes.add("baby");
         }
-        if (containsAny(normalizedTitle, "下饭", "鱼香", "宫保", "红烧", "麻婆", "辣子")) {
+        if (containsAny(normalizedTitle, "下饭", "鱼香", "宫保", "红烧", "麻婆", "辣子")
+                || containsAnyList(normalizedCategories, "下饭菜")) {
             codes.add("with_rice");
         }
 
@@ -116,20 +124,20 @@ public final class SceneTagResolver {
     }
 
     private static boolean isDietRecipe(String title, List<String> categories, List<String> ingredients, String taste) {
-        boolean explicitSignal = containsAny(title, "减脂", "轻食", "低卡", "健身餐", "沙拉")
+        boolean explicitSignal = containsAny(title, "减脂", "轻食", "低卡", "健身餐", "沙拉", "高蛋白")
                 || containsAnyList(categories, "减脂", "轻食", "健身", "沙拉", "瘦身");
 
         boolean leanProteinSignal = containsAnyList(ingredients,
-                "鸡胸", "虾", "虾仁", "鳕鱼", "鱼片", "金枪鱼", "三文鱼", "鸡蛋白", "蛋白", "豆腐", "魔芋");
+                "鸡胸", "鸡胸肉", "虾", "虾仁", "鳕鱼", "鱼片", "金枪鱼", "三文鱼", "蛋白", "豆腐", "魔芋", "牛腱");
         boolean vegetableSignal = containsAnyList(ingredients,
-                "生菜", "西兰花", "黄瓜", "番茄", "圣女果", "紫甘蓝", "菠菜", "芦笋", "苦瓜", "玉米粒");
+                "生菜", "西兰花", "黄瓜", "番茄", "圣女果", "紫甘蓝", "菠菜", "苦瓜", "玉米粒", "蘑菇");
         boolean cleanTasteSignal = containsAny(taste, "清淡", "原味");
 
         boolean positive = explicitSignal || (leanProteinSignal && (vegetableSignal || cleanTasteSignal));
 
         boolean heavyTitleSignal = containsAny(title,
                 "红烧", "糖醋", "可乐", "干锅", "回锅", "香酥", "油焖", "炸", "排骨", "肘子", "猪蹄", "扣肉", "宫保", "鱼香",
-                "炒饭", "锅贴", "蛋饼", "煎饼", "薯条", "年糕");
+                "炒饭", "锅贴", "蛋饼", "煎饼", "油条", "年糕");
         boolean heavyIngredientSignal = containsAnyList(ingredients,
                 "排骨", "猪蹄", "五花肉", "肥牛", "肥羊", "腊肉", "培根", "香肠", "腊肠", "火腿", "年糕", "沙拉酱", "奶油", "黄油");
         boolean heavyTasteSignal = containsAny(taste, "甜味", "酸甜");

@@ -2,7 +2,7 @@
   <div class="recommend-page container page-shell">
     <div class="page-header">
       <h2>为你推荐</h2>
-      <p>基于你的浏览历史和喜好，为你精选以下菜谱</p>
+      <p>结合你的偏好与当前场景模式，为你智能挑选更合适的菜谱</p>
     </div>
 
     <div class="tabs-wrapper">
@@ -45,24 +45,32 @@
       <el-segmented v-model="selectedCategoryId" :options="categorySegmentOptions" @change="fetchRecommend" />
     </div>
 
-    <RecipeGrid :recipes="recipeList" :loading="loading" />
+    <transition name="mode-fade" mode="out-in">
+      <RecipeGrid :key="gridKey" :recipes="recipeList" :loading="loading" />
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
 import { Star, TrendCharts, Clock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { trackBehavior } from '@/utils/tracker'
+import { useSceneModeStore } from '@/stores/sceneMode'
 
+const sceneModeStore = useSceneModeStore()
+const { currentMode } = storeToRefs(sceneModeStore)
 const activeTab = ref('personal')
 const recipeList = ref([])
 const loading = ref(false)
 const cache = new Map()
 const selectedCategoryId = ref('')
 const categoryOptions = ref([])
+
+const gridKey = computed(() => `${currentMode.value}_${activeTab.value}_${selectedCategoryId.value || 'all'}`)
 
 const categorySegmentOptions = computed(() => {
   const options = [{ label: '全部', value: '' }]
@@ -83,33 +91,36 @@ const loadCategories = async () => {
 
 const fetchRecommend = async () => {
   const categoryKey = activeTab.value === 'personal' ? selectedCategoryId.value || 'all' : 'all'
-  const cacheKey = `${activeTab.value}_${categoryKey}_12`
-  const shouldUseCache = activeTab.value !== 'personal'
-  if (shouldUseCache && cache.has(cacheKey)) {
+  const cacheKey = `${activeTab.value}_${categoryKey}_${currentMode.value}_12`
+  if (cache.has(cacheKey)) {
     recipeList.value = cache.get(cacheKey)
     return
   }
 
   loading.value = true
   try {
-    const params = { type: activeTab.value, limit: 12 }
+    const params = { type: activeTab.value, limit: 12, mode: currentMode.value }
     if (activeTab.value === 'personal' && selectedCategoryId.value) {
       params.categoryId = selectedCategoryId.value
     }
     const res = await recipeApi.getRecommend(params)
     recipeList.value = res.data.list || []
-    if (shouldUseCache) {
-      cache.set(cacheKey, recipeList.value)
-    }
+    cache.set(cacheKey, recipeList.value)
     const selectedCategoryName = categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
     trackBehavior('recommend_request', {
       sourcePage: 'recommend',
       sceneCode: null,
-      extra: { type: activeTab.value, size: recipeList.value.length, categoryId: params.categoryId || null, categoryName: selectedCategoryName }
+      extra: {
+        type: activeTab.value,
+        mode: currentMode.value,
+        size: recipeList.value.length,
+        categoryId: params.categoryId || null,
+        categoryName: selectedCategoryName
+      }
     })
   } catch (error) {
     recipeList.value = []
-    ElMessage.warning('推荐加载较慢，请稍后重试')
+    ElMessage.warning('推荐加载稍慢，请稍后重试')
   } finally {
     loading.value = false
   }
@@ -117,7 +128,12 @@ const fetchRecommend = async () => {
 
 onMounted(async () => {
   await loadCategories()
-  trackBehavior('page_view', { sourcePage: 'recommend' })
+  trackBehavior('page_view', { sourcePage: 'recommend', extra: { mode: currentMode.value } })
+  await fetchRecommend()
+})
+
+watch(currentMode, async () => {
+  cache.clear()
   await fetchRecommend()
 })
 </script>
@@ -184,6 +200,17 @@ onMounted(async () => {
   color: var(--text-secondary);
   font-size: 14px;
   flex-shrink: 0;
+}
+
+.mode-fade-enter-active,
+.mode-fade-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.mode-fade-enter-from,
+.mode-fade-leave-to {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 @media (max-width: 768px) {
