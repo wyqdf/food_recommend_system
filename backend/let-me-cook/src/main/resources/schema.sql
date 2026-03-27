@@ -169,6 +169,17 @@ CREATE TABLE IF NOT EXISTS comments (
     FOREIGN KEY (user_id) REFERENCES users(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论表';
 
+-- 评论点赞明细表
+CREATE TABLE IF NOT EXISTS comment_likes (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    comment_id INT NOT NULL,
+    user_id INT NOT NULL,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_comment_like_user_comment (user_id, comment_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='评论点赞明细表';
+
 -- 用户互动表（点赞、收藏等）
 CREATE TABLE IF NOT EXISTS interactions (
     id INT PRIMARY KEY AUTO_INCREMENT,
@@ -176,8 +187,12 @@ CREATE TABLE IF NOT EXISTS interactions (
     recipe_id INT NOT NULL,
     interaction_type ENUM('like', 'favorite', 'view') NOT NULL,
     create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    favorite_unique_flag TINYINT GENERATED ALWAYS AS (
+        CASE WHEN interaction_type = 'favorite' THEN 1 ELSE NULL END
+    ) STORED,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE
+    FOREIGN KEY (recipe_id) REFERENCES recipes(id) ON DELETE CASCADE,
+    UNIQUE KEY uk_interactions_user_recipe_favorite (user_id, recipe_id, favorite_unique_flag)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户互动表';
 
 -- 行为埋点事件表
@@ -275,6 +290,7 @@ CREATE INDEX idx_recipe_like_count ON recipes(like_count DESC);
 CREATE INDEX idx_recipe_create_time ON recipes(create_time DESC);
 CREATE INDEX idx_recipes_status_create_time ON recipes(status, create_time DESC, id DESC);
 CREATE INDEX idx_recipes_status_like_count ON recipes(status, like_count DESC, id DESC);
+CREATE INDEX idx_recipes_status_favorite_count ON recipes(status, favorite_count DESC, id DESC);
 CREATE INDEX idx_recipes_status_rating_count ON recipes(status, rating_count DESC, id DESC);
 CREATE INDEX idx_recipes_admin_create_time ON recipes(create_time DESC, id DESC);
 CREATE INDEX idx_comment_recipe ON comments(recipe_id);
@@ -282,6 +298,8 @@ CREATE INDEX idx_comment_recipe_publish_time ON comments(recipe_id, publish_time
 CREATE INDEX idx_comment_create_time ON comments(create_time DESC);
 CREATE INDEX idx_comment_user ON comments(user_id);
 CREATE INDEX idx_comment_user_create ON comments(user_id, create_time);
+CREATE INDEX idx_comment_likes_comment_time ON comment_likes(comment_id, create_time DESC);
+CREATE INDEX idx_comment_likes_user_time ON comment_likes(user_id, create_time DESC);
 CREATE INDEX idx_interaction_user ON interactions(user_id);
 CREATE INDEX idx_interaction_recipe ON interactions(recipe_id);
 CREATE INDEX idx_interaction_user_type ON interactions(user_id, interaction_type);

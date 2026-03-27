@@ -8,7 +8,9 @@ import com.foodrecommend.letmecook.mapper.*;
 import com.foodrecommend.letmecook.service.FavoriteService;
 import com.foodrecommend.letmecook.service.RecipeListDTOAssembler;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -24,25 +26,28 @@ public class FavoriteServiceImpl implements FavoriteService {
     private final RecipeListDTOAssembler recipeListDTOAssembler;
 
     @Override
+    @Transactional
     public void addFavorite(Integer userId, Integer recipeId) {
-        if (interactionMapper.existsFavorite(userId, recipeId)) {
-            return;
-        }
-
         Interaction interaction = new Interaction();
         interaction.setUserId(userId);
         interaction.setRecipeId(recipeId);
         interaction.setInteractionType("favorite");
-        interactionMapper.insert(interaction);
-
-        recipeMapper.incrementFavoriteCount(recipeId);
+        try {
+            int inserted = interactionMapper.insert(interaction);
+            if (inserted > 0) {
+                recipeMapper.incrementFavoriteCount(recipeId);
+            }
+        } catch (DuplicateKeyException ignored) {
+            // 收藏唯一约束会拦住并发重复收藏；重复请求按幂等成功处理即可。
+        }
     }
 
     @Override
+    @Transactional
     public void removeFavorite(Integer userId, Integer recipeId) {
         int deleted = interactionMapper.deleteFavorite(userId, recipeId);
         if (deleted > 0) {
-            recipeMapper.decrementFavoriteCount(recipeId);
+            recipeMapper.decrementFavoriteCountBy(recipeId, deleted);
         }
     }
 
@@ -55,17 +60,24 @@ public class FavoriteServiceImpl implements FavoriteService {
     public PageResult<RecipeListDTO> getFavorites(Integer userId, int page, int pageSize) {
         int safePage = Math.max(page, 1);
         int safePageSize = Math.max(pageSize, 1);
-        List<Integer> recipeIds = interactionMapper.findFavoriteRecipeIds(userId);
-
-        int start = (safePage - 1) * safePageSize;
-        int end = Math.min(start + safePageSize, recipeIds.size());
-        
-        if (start >= recipeIds.size()) {
-            return new PageResult<>(List.of(), recipeIds.size(), safePage, safePageSize);
+        long total = interactionMapper.countPublicFavoriteRecipes(userId);
+        if (total <= 0) {
+            return new PageResult<>(List.of(), 0, safePage, safePageSize);
         }
 
-        List<Integer> pageRecipeIds = recipeIds.subList(start, end);
+        int start = (safePage - 1) * safePageSize;
+        if (start >= total) {
+            return new PageResult<>(List.of(), total, safePage, safePageSize);
+        }
+
+        List<Integer> pageRecipeIds = interactionMapper.findPublicFavoriteRecipeIdsPage(userId, start, safePageSize);
+        if (pageRecipeIds == null || pageRecipeIds.isEmpty()) {
+            return new PageResult<>(List.of(), total, safePage, safePageSize);
+        }
         List<Recipe> recipes = recipeMapper.findByIds(pageRecipeIds);
+        if (recipes == null || recipes.isEmpty()) {
+            return new PageResult<>(List.of(), total, safePage, safePageSize);
+        }
 
         // 按收藏顺序输出，避免 IN 查询返回顺序不稳定
         Map<Integer, Recipe> recipeMap = recipes.stream()
@@ -80,6 +92,6 @@ public class FavoriteServiceImpl implements FavoriteService {
 
         List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(orderedRecipes);
 
-        return new PageResult<>(list, recipeIds.size(), safePage, safePageSize);
+        return new PageResult<>(list, total, safePage, safePageSize);
     }
 }

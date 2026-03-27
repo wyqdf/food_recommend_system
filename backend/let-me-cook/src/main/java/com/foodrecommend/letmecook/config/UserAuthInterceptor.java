@@ -12,6 +12,8 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.io.IOException;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -27,56 +29,64 @@ public class UserAuthInterceptor implements HandlerInterceptor {
             return true;
         }
 
+        boolean optionalAuth = isOptionalCommentReadRequest(request);
         String authorization = request.getHeader("Authorization");
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"未授权，需要登录\"}");
-            return false;
+            return rejectOrAllowAnonymous(response, optionalAuth, "未授权，需要登录");
         }
 
         String token = authorization.substring(7);
         
         if (tokenBlacklistService.isBlacklisted(token)) {
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"Token 已失效，请重新登录\"}");
-            return false;
+            return rejectOrAllowAnonymous(response, optionalAuth, "Token 已失效，请重新登录");
         }
         
         try {
             Integer userId = jwtUtil.validateUserTokenAndGetUserId(token);
             if (userId == null) {
-                response.setStatus(401);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":401,\"message\":\"无效的用户 Token\"}");
-                return false;
+                return rejectOrAllowAnonymous(response, optionalAuth, "无效的用户 Token");
             }
             
             User user = userMapper.findById(userId);
             if (user == null) {
-                response.setStatus(401);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":401,\"message\":\"用户不存在\"}");
-                return false;
+                return rejectOrAllowAnonymous(response, optionalAuth, "用户不存在");
             }
             
             if (user.getStatus() != null && user.getStatus() == 0) {
                 tokenBlacklistService.addToBlacklist(token);
-                response.setStatus(401);
-                response.setContentType("application/json;charset=UTF-8");
-                response.getWriter().write("{\"code\":401,\"message\":\"账号已被禁用\"}");
-                return false;
+                return rejectOrAllowAnonymous(response, optionalAuth, "账号已被禁用");
             }
             
             request.setAttribute("userId", userId);
         } catch (Exception e) {
-            response.setStatus(401);
-            response.setContentType("application/json;charset=UTF-8");
-            response.getWriter().write("{\"code\":401,\"message\":\"Token 验证失败：" + e.getMessage() + "\"}");
-            return false;
+            return rejectOrAllowAnonymous(response, optionalAuth, "Token 验证失败：" + e.getMessage());
         }
 
         return true;
+    }
+
+    private boolean isOptionalCommentReadRequest(HttpServletRequest request) {
+        if (!"GET".equalsIgnoreCase(request.getMethod())) {
+            return false;
+        }
+
+        String requestUri = request.getRequestURI();
+        String contextPath = request.getContextPath();
+        String path = requestUri;
+        if (contextPath != null && !contextPath.isEmpty() && requestUri != null && requestUri.startsWith(contextPath)) {
+            path = requestUri.substring(contextPath.length());
+        }
+        return path != null && path.startsWith("/api/comments/recipe/");
+    }
+
+    private boolean rejectOrAllowAnonymous(HttpServletResponse response, boolean optionalAuth, String message) throws IOException {
+        if (optionalAuth) {
+            return true;
+        }
+
+        response.setStatus(401);
+        response.setContentType("application/json;charset=UTF-8");
+        response.getWriter().write("{\"code\":401,\"message\":\"" + message + "\"}");
+        return false;
     }
 }

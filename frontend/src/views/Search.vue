@@ -120,6 +120,7 @@ import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
 import SearchEntry from '@/components/SearchEntry.vue'
 import { trackBehavior } from '@/utils/tracker'
+import { createLatestRequestGuard } from '@/utils/latestRequest'
 import { SEARCH_HOT_KEYWORDS, addSearchHistory, clearSearchHistory, getSearchHistory } from '@/utils/search'
 
 const route = useRoute()
@@ -135,6 +136,7 @@ const pageSize = 12
 const total = ref(0)
 const errorMessage = ref('')
 const recentSearches = ref([])
+const latestSearchGuard = createLatestRequestGuard()
 
 const searchableScopes = ['菜名', '食材', '作者', '分类', '口味', '做法']
 const hotKeywords = SEARCH_HOT_KEYWORDS
@@ -220,6 +222,7 @@ const loadSearchResults = async () => {
 
   loading.value = true
   errorMessage.value = ''
+  const requestId = latestSearchGuard.begin()
 
   try {
     const res = await recipeApi.search({
@@ -231,15 +234,23 @@ const loadSearchResults = async () => {
       timeout: 20000,
       silentError: true
     })
+    if (!latestSearchGuard.isLatest(requestId)) {
+      return
+    }
 
     recipeList.value = Array.isArray(res.data.list) ? res.data.list : []
     total.value = Number(res.data.total || 0)
   } catch (error) {
+    if (!latestSearchGuard.isLatest(requestId)) {
+      return
+    }
     recipeList.value = []
     total.value = 0
-    errorMessage.value = error.response?.data?.message || error.message || '请稍后重试'
+    errorMessage.value = error.businessResponse?.message || error.response?.data?.message || error.message || '请稍后重试'
   } finally {
-    loading.value = false
+    if (latestSearchGuard.isLatest(requestId)) {
+      loading.value = false
+    }
   }
 }
 

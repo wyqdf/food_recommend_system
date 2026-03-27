@@ -30,7 +30,7 @@ public interface RecipeMapper {
                         "ORDER BY r.like_count DESC, r.id DESC" +
                         "</when>" +
                         "<when test='sort == \"collect\"'>" +
-                        "ORDER BY r.rating_count DESC, r.id DESC" +
+                        "ORDER BY r.favorite_count DESC, r.id DESC" +
                         "</when>" +
                         "<otherwise>" +
                         "ORDER BY r.create_time DESC, r.id DESC" +
@@ -289,16 +289,55 @@ public interface RecipeMapper {
         })
         List<String> findIngredientSuggestions(@Param("keyword") String keyword, @Param("limit") int limit);
 
+        @Select("SELECT COALESCE(MAX(id), 0) FROM recipes FORCE INDEX (idx_recipes_status_id) WHERE status = 1")
+        Integer findMaxPublicRecipeId();
+
+        @Select("SELECT COALESCE(MAX(id), 0) FROM recipes WHERE status = 1")
+        Integer findMaxPublicRecipeIdFallback();
+
         @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
-                        "FROM recipes r " +
+                        "FROM recipes AS r FORCE INDEX (idx_recipes_status_id) " +
                         "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
                         "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
                         "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
                         "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
-                        "WHERE r.id >= (SELECT FLOOR(RAND() * (SELECT MAX(id) FROM recipes))) " +
-                        "AND r.status = 1 " +
-                        "ORDER BY r.id LIMIT #{limit}")
-        List<Recipe> findRandom(@Param("limit") int limit);
+                        "WHERE r.status = 1 AND r.id >= #{seedId} " +
+                        "ORDER BY r.id ASC " +
+                        "LIMIT #{limit}")
+        List<Recipe> findRandomFromSeed(@Param("seedId") int seedId, @Param("limit") int limit);
+
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
+                        "FROM recipes AS r " +
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
+                        "WHERE r.status = 1 AND r.id >= #{seedId} " +
+                        "ORDER BY r.id ASC " +
+                        "LIMIT #{limit}")
+        List<Recipe> findRandomFromSeedFallback(@Param("seedId") int seedId, @Param("limit") int limit);
+
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
+                        "FROM recipes AS r FORCE INDEX (idx_recipes_status_id) " +
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
+                        "WHERE r.status = 1 AND r.id < #{seedId} " +
+                        "ORDER BY r.id ASC " +
+                        "LIMIT #{limit}")
+        List<Recipe> findRandomBeforeSeed(@Param("seedId") int seedId, @Param("limit") int limit);
+
+        @Select("SELECT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
+                        "FROM recipes AS r " +
+                        "LEFT JOIN difficulties d ON r.difficulty_id = d.id " +
+                        "LEFT JOIN time_costs tc ON r.time_cost_id = tc.id " +
+                        "LEFT JOIN tastes ta ON r.taste_id = ta.id " +
+                        "LEFT JOIN techniques tech ON r.technique_id = tech.id " +
+                        "WHERE r.status = 1 AND r.id < #{seedId} " +
+                        "ORDER BY r.id ASC " +
+                        "LIMIT #{limit}")
+        List<Recipe> findRandomBeforeSeedFallback(@Param("seedId") int seedId, @Param("limit") int limit);
 
         @Select("<script>" +
                         "SELECT DISTINCT r.*, d.name as difficultyName, tc.name as timeCostName, ta.name as tasteName, tech.name as techniqueName " +
@@ -327,11 +366,14 @@ public interface RecipeMapper {
         @Update("UPDATE recipes SET reply_count = reply_count + 1 WHERE id = #{id}")
         int incrementReplyCount(Integer id);
 
-        @Update("UPDATE recipes SET rating_count = rating_count + 1 WHERE id = #{id}")
+        @Update("UPDATE recipes SET favorite_count = favorite_count + 1 WHERE id = #{id}")
         int incrementFavoriteCount(Integer id);
 
-        @Update("UPDATE recipes SET rating_count = GREATEST(0, rating_count - 1) WHERE id = #{id}")
+        @Update("UPDATE recipes SET favorite_count = GREATEST(0, favorite_count - 1) WHERE id = #{id}")
         int decrementFavoriteCount(Integer id);
+
+        @Update("UPDATE recipes SET favorite_count = GREATEST(0, favorite_count - #{amount}) WHERE id = #{id}")
+        int decrementFavoriteCountBy(@Param("id") Integer id, @Param("amount") int amount);
 
         @Insert("INSERT INTO recipes (title, author, author_uid, description, tips, cookware, image, taste_id, technique_id, time_cost_id, difficulty_id, create_time, update_time) "
                         +

@@ -169,6 +169,18 @@
         </el-col>
       </el-row>
     </template>
+    <div v-else class="detail-error-state">
+      <el-result
+        :icon="loadErrorState === 'not-found' ? 'warning' : 'error'"
+        :title="loadErrorState === 'not-found' ? '菜谱不存在' : '加载失败'"
+        :sub-title="loadErrorMessage || '请稍后再试'"
+      >
+        <template #extra>
+          <el-button @click="retryLoad">重新加载</el-button>
+          <el-button type="primary" @click="router.push('/recipes')">返回菜谱列表</el-button>
+        </template>
+      </el-result>
+    </div>
   </div>
 </template>
 
@@ -200,6 +212,18 @@ const commentPage = ref(1)
 const commentPageSize = ref(10)
 const commentTotal = ref(0)
 const pageEnterAt = ref(Date.now())
+const loadErrorState = ref('')
+const loadErrorMessage = ref('')
+
+const resetDetailState = () => {
+  recipe.value = null
+  steps.value = []
+  ingredients.value = []
+  comments.value = []
+  recommendList.value = []
+  isFavorited.value = false
+  commentTotal.value = 0
+}
 
 const loadFavoriteState = async (recipeId) => {
   if (!userStore.isLoggedIn || !recipeId) {
@@ -251,46 +275,55 @@ const seasoningIngredients = computed(() => {
   return unique
 })
 
-const fetchDetail = async () => {
+const fetchDetail = async (recipeId = route.params.id) => {
   loading.value = true
+  loadErrorState.value = ''
+  loadErrorMessage.value = ''
+  resetDetailState()
   try {
-    const res = await recipeApi.getDetail(route.params.id)
+    const res = await recipeApi.getDetail(recipeId, { silentError: true })
     recipe.value = res.data
     steps.value = res.data.steps || []
     ingredients.value = res.data.ingredients || []
   } catch (error) {
-    ElMessage.error('加载菜谱详情失败，请检查网络后重试')
+    const message = error?.message || '加载菜谱详情失败，请检查网络后重试'
+    loadErrorMessage.value = message
+    loadErrorState.value = message.includes('不存在') ? 'not-found' : 'error'
+    if (loadErrorState.value !== 'not-found') {
+      ElMessage.error('加载菜谱详情失败，请检查网络后重试')
+    }
     console.error('Recipe detail fetch error:', error)
   } finally {
     loading.value = false
   }
 }
 
-onMounted(async () => {
+const loadRecipePage = async (recipeId, options = {}) => {
+  const { resetCommentPage = false, trackPageView = true } = options
+  if (resetCommentPage) {
+    commentPage.value = 1
+  }
   pageEnterAt.value = Date.now()
-  await fetchDetail()
+  await fetchDetail(recipeId)
   if (!recipe.value) return
-  trackBehavior('page_view', { sourcePage: 'recipe_detail', recipeId: Number(route.params.id) })
+  if (trackPageView) {
+    trackBehavior('page_view', { sourcePage: 'recipe_detail', recipeId: Number(recipeId) })
+  }
   await Promise.allSettled([
-    loadFavoriteState(route.params.id),
+    loadFavoriteState(recipeId),
     fetchComments({ silent: true }),
-    loadRecommendList(route.params.id)
+    loadRecommendList(recipeId)
   ])
+}
+
+onMounted(async () => {
+  await loadRecipePage(route.params.id)
 })
 
 watch(() => route.params.id, async (newId, oldId) => {
   if (newId) {
     reportViewDuration(Number(oldId))
-    pageEnterAt.value = Date.now()
-    await fetchDetail()
-    if (!recipe.value) return
-    trackBehavior('page_view', { sourcePage: 'recipe_detail', recipeId: Number(newId) })
-    commentPage.value = 1
-    await Promise.allSettled([
-      loadFavoriteState(newId),
-      fetchComments({ silent: true }),
-      loadRecommendList(newId)
-    ])
+    await loadRecipePage(newId, { resetCommentPage: true })
   }
 })
 
@@ -320,6 +353,9 @@ const toggleFavorite = async () => {
     if (isFavorited.value) {
       await favoriteApi.remove(recipe.value.id)
       isFavorited.value = false
+      if (recipe.value) {
+        recipe.value.favoriteCount = Math.max(0, (recipe.value.favoriteCount || 0) - 1)
+      }
       trackBehavior('favorite_remove', {
         sourcePage: 'recipe_detail',
         recipeId: recipe.value.id
@@ -328,6 +364,9 @@ const toggleFavorite = async () => {
     } else {
       await favoriteApi.add(recipe.value.id)
       isFavorited.value = true
+      if (recipe.value) {
+        recipe.value.favoriteCount = (recipe.value.favoriteCount || 0) + 1
+      }
       trackBehavior('favorite_add', {
         sourcePage: 'recipe_detail',
         recipeId: recipe.value.id
@@ -355,12 +394,12 @@ const submitComment = async () => {
     const createdComment = {
       id: res.data?.id,
       recipeId: res.data?.recipeId ?? recipe.value.id,
-      userId: res.data?.userId ?? userStore.userInfo?.id,
+      userId: res.data?.userId ?? userStore.user?.id,
       content: res.data?.content ?? content,
       publishTime: res.data?.publishTime ?? new Date().toISOString(),
       likes: res.data?.likes ?? 0,
-      username: res.data?.username || userStore.userInfo?.username || userStore.userInfo?.nickname || '我',
-      avatar: res.data?.avatar || userStore.userInfo?.avatar || '',
+      username: res.data?.username || userStore.user?.username || userStore.user?.nickname || '我',
+      avatar: res.data?.avatar || userStore.user?.avatar || '',
       isLiked: false
     }
     commentPage.value = 1
@@ -397,6 +436,10 @@ const handleCommentPageChange = (page) => {
   fetchComments()
 }
 
+const retryLoad = async () => {
+  await loadRecipePage(route.params.id, { trackPageView: false })
+}
+
 const goRecipe = (id) => {
   router.push(`/recipe/${id}`)
 }
@@ -421,6 +464,10 @@ const goCookMode = () => {
 <style scoped>
 .detail-page {
   padding-top: 0;
+}
+
+.detail-error-state {
+  padding: 48px 0 24px;
 }
 
 .recipe-header {

@@ -29,6 +29,46 @@ const isPublicApi = (url) => {
   return publicApis.some(api => url.startsWith(api));
 };
 
+const createBusinessError = (response, config) => {
+  const message = response?.message || "请求失败";
+  const error = new Error(message);
+  error.name = "BusinessError";
+  error.responseCode = Number(response?.code || 500);
+  error.businessResponse = response;
+  error.config = config;
+  return error;
+};
+
+const handleUnauthorized = (url, message, silentError) => {
+  const isAdminRoute = url.startsWith("/admin");
+  const resolvedMessage = message || "登录已过期，请重新登录";
+
+  if (isAdminRoute) {
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_info");
+    if (window.location.pathname !== '/admin/login') {
+      if (!silentError) {
+        ElMessage.warning(resolvedMessage);
+      }
+      setTimeout(() => {
+        window.location.href = "/admin/login";
+      }, 500);
+    }
+    return;
+  }
+
+  localStorage.removeItem("token");
+  localStorage.removeItem("user_info");
+  if (!isPublicApi(url) && window.location.pathname !== '/login') {
+    if (!silentError) {
+      ElMessage.warning(resolvedMessage);
+    }
+    setTimeout(() => {
+      window.location.href = "/login";
+    }, 500);
+  }
+};
+
 request.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
@@ -50,8 +90,16 @@ request.interceptors.response.use(
   (response) => {
     const res = response.data;
     if (res.code !== 200) {
-      ElMessage.error(res.message || "请求失败");
-      return Promise.reject(new Error(res.message || "请求失败"));
+      const url = response.config?.url || '';
+      const silentError = Boolean(response.config?.silentError);
+      const businessError = createBusinessError(res, response.config);
+
+      if (businessError.responseCode === 401) {
+        handleUnauthorized(url, res.message, silentError);
+      } else if (!silentError) {
+        ElMessage.error(res.message || "请求失败");
+      }
+      return Promise.reject(businessError);
     }
     return res;
   },
@@ -64,30 +112,7 @@ request.interceptors.response.use(
       : errorMessage;
     
     if (error.response?.status === 401) {
-      const isAdminRoute = url.startsWith("/admin");
-      
-      if (isAdminRoute) {
-        localStorage.removeItem("admin_token");
-        localStorage.removeItem("admin_info");
-        if (window.location.pathname !== '/admin/login') {
-          ElMessage.warning(errorMessage || "管理员登录已过期，请重新登录");
-          setTimeout(() => {
-            window.location.href = "/admin/login";
-          }, 500);
-        }
-      } else {
-        localStorage.removeItem("token");
-        localStorage.removeItem("user_info");
-        
-        if (!isPublicApi(url)) {
-          if (window.location.pathname !== '/login') {
-            ElMessage.warning(resolvedMessage || "登录已过期，请重新登录");
-            setTimeout(() => {
-              window.location.href = "/login";
-            }, 500);
-          }
-        }
-      }
+      handleUnauthorized(url, resolvedMessage, silentError);
     } else if (!silentError) {
       ElMessage.error(resolvedMessage);
     }

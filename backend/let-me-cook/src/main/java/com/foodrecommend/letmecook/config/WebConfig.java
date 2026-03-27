@@ -36,6 +36,6 @@ public class WebConfig implements WebMvcConfigurer {
         
         registry.addInterceptor(userAuthInterceptor)
                 .addPathPatterns("/api/users/**", "/api/comments/**", "/api/favorites/**")
-                .excludePathPatterns("/api/users/login", "/api/users/register", "/api/comments/recipe/**");
+                .excludePathPatterns("/api/users/login", "/api/users/register");
     }
 }
