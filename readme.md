@@ -1,289 +1,181 @@
 # 美食推荐系统（foodrec）
 
-一个可本地直接跑起来的美食推荐系统，包含：
+一个面向本地开发与课程/项目演示的美食推荐系统，包含：
 
-- 用户端
-- 管理后台
+- Vue 3 用户端与管理后台
 - Spring Boot 后端
-- MySQL 数据库
-- 可选的 Elasticsearch 搜索
-- 离线 Top100 推荐脚本与模型清单
+- MySQL 业务库
+- Elasticsearch Search V2
+- 仓库内离线 `Top100` 推荐源码入口与模型清单
 
-## 先看这两个文档
+## 当前快照
+
+> 最后整理：`2026-03-28 02:51:45`
+
+- 推荐开发端口：前端 `3000`，后端 `8081`
+- Windows 已提供源码直启脚本：
+  - `run-latest-dev.ps1`
+  - `stop-latest-dev.ps1`
+- 推荐接口当前真实口径：
+  - 登录用户命中场景且存在离线 `Top100` 时，`type=personal` 改为“离线与实时分开筛选，再交错返回”
+  - 目标配额按 `ceil(limit * 0.7)` 保证至少 `70%` 优先来自命中当前场景的离线 `Top100`
+  - 若命中场景的 `Top100` 不足，不会补入非场景 `Top100`，而是用命中当前场景的实时结果补齐
+  - 实时补位来自更大的热门源与非热门源候选池，带随机性，避免剩余 `30%` 全被大热门占满
+  - `Top100` 卡片优先保留离线模型理由，仅在理由缺失时补场景文案
+- 首页当前行为：
+  - `为你推荐` 与推荐页 `type=personal` 使用同一条推荐链路
+  - `热门菜谱` 改成从更大的热门候选池中随机抽样展示
+  - `热门分类` 来自 `GET /api/categories/recommend`
+- 最近一轮接口性能优化：
+  - `recipes` 随机候选查询已改成基于 `status + id` 索引的随机种子范围扫描，避免在 30 万菜谱表上全量扫 `status=1`
+  - 登录态 `type=personal` 合并了重复的偏好/历史种子查询与候选装配
+  - 个性化推荐收藏种子改为数据库直接取最近公开收藏 `LIMIT 20`，避免全量装载收藏记录
+  - 收藏列表分页改为数据库分页；收藏统计统一回到 `recipes.favorite_count`
+  - 管理端与统计页的浏览量统一基于 `behavior_events` 中的 `recipe_view` 事件
+  - 列表页命中 `mode` 时不再默认粗拉 `5000` 条候选做场景重排，冷请求耗时明显下降
+- 最近一轮验证状态：
+  - 后端 `./mvnw.cmd test` 已通过，`41` 项测试绿色通过
+  - 前端 `npm run build` 已通过
+  - 已完成登录、首页、搜索、详情、收藏、7 日报告、管理端首页与菜谱管理页的浏览器流程回归
+- 最新本地测速样例：
+  - `GET /api/recipes/recommend?type=personal&limit=12&mode=family`：约 `211.26ms`
+  - `GET /api/favorites?page=1&pageSize=12`：约 `8.18ms`
+  - `GET /api/users/profile`：约 `7.52ms`
+  - `GET /api/recipes/search?keyword=鸡&page=1&pageSize=12`：约 `63.17ms`
+  - `GET /api/admin/recipes?page=1&pageSize=5`：约 `66.82ms`
+- 前端 `Home.vue`、`Recommend.vue`、`Recipes.vue` 已接入 `latestRequest` 防护，避免切模式/切筛选时旧请求覆盖新结果
+- 登录页只展示 5 个测试账号名称用于演示，不再暗示自动登录或展示用户偏好
+
+## 先看哪份文档
 
 - [快速启动指南.md](./快速启动指南.md)
-  适合第一次从 GitHub 拉取项目后，按步骤把本地服务跑起来。
+  - 第一次把项目跑起来、导库、自检、排障时看这里
+- [docs/README.md](./docs/README.md)
+  - 想快速找到“该看哪一份专题文档”时看这里
 - [agent.md](./agent.md)
-  适合接手开发、排障、看系统结构和数据库细节。
+  - 接手开发、排查架构与数据库细节时看这里
 
-## 当前技术栈
-
-- 前端：Vue 3 + Vite 5 + Element Plus + Pinia + Axios + ECharts
-- 后端：Spring Boot 3.2.2 + MyBatis + MySQL 8 + Elasticsearch
-- Java：21
-- Node.js：建议 18+
-- 构建工具：Maven 3.9+
-
-## 最小依赖清单
-
-第一次把项目跑起来，实际上只需要这些：
-
-- 必需：MySQL 8
-- 必需：Java 21
-- 必需：Maven 3.9+
-- 必需：Node.js 18+
-- 可选：Docker Desktop
-- 可选：Elasticsearch
-
-说明：
-
-- **不启动 Elasticsearch 也可以先把项目跑起来**
-- **不配置 OSS 也不影响本地启动**
-- 第一次上手建议先跑 `MySQL + 后端 8081 + 前端 3000`
-
-## 仓库结构
-
-```text
-foodrec/
-├── backend/let-me-cook/                 # Spring Boot 后端
-├── frontend/                            # 用户端 + 管理后台同一个前端工程
-├── docs/                                # 专题文档
-├── infra/elasticsearch/                 # ES smartcn 镜像
-├── scripts/                             # 辅助脚本
-├── local_top100_cke_full/               # 离线 Top100 说明、模型清单与轻量源码入口（大文件不进普通 Git）
-├── agent.md                             # 项目交接总文档
-├── 快速启动指南.md                       # 本地启动文档
-└── docker-compose.yml                   # ES / 前后端容器编排
-```
-
-## 当前离线推荐口径
-
-仓库现在已经内置了本地离线 `Top100` 推荐所需的源码、映射和模型清单：
-
-- `local_top100_cke_full/cke_full_source/`
-- `local_top100_cke_full/knowledge_graph_source/`
-- `local_top100_cke_full/selected_model_manifest.json`
-
-说明：
-
-- 普通 Git 会保留源码、映射文件、图谱脚本和模型清单
-- 大型模型权重、缓存和运行工件不随普通 Git 推送，需要单独同步
-
-当前默认使用历史最优 `CKEFull` 模型为映射用户生成 `Top100`，结果写入数据库后：
-
-- `GET /api/recipes/recommend?type=personal`
-- `GET /api/recipes/recommend?type=daily`
-
-都会优先读取这批离线结果；没有命中离线结果的用户则回退到原有实时推荐。
-
-当前推荐页还有两条补充口径：
-
-- `personal` 已改成“离线 `Top100` + 实时推荐”混合返回，其中约 `50%` 来自实时推荐链路
-- 推荐页分类筛选改成读取后端前 10 热门分类，来源于 `GET /api/categories/recommend?limit=10`
-
-## 5 分钟本地跑起来
+## 最短启动路径
 
 ### 1. 准备环境
 
-- MySQL 8
 - Java 21
 - Maven 3.9+
 - Node.js 18+
-- Docker Desktop（可选，仅在你想启用 Elasticsearch 时需要）
+- MySQL 8
+- Docker Desktop
+  - 可选，但 `run-latest-dev.ps1` 会检查 Docker 中是否有旧容器；如果本机没有 `docker` 命令，建议改用手动启动
 
 ### 2. 初始化数据库
 
-项目默认连接：
-
-- 数据库：`food_recommend`
-- 用户名：`root`
-- 密码：`123456`
-
-如果你的本地 MySQL 密码不是 `123456`，启动后端前请自行设置环境变量 `DB_PASSWORD`。
-
-首次启动时，优先使用**完整的 `food_recommend` 数据库备份**。
-
-最推荐：
-
-- 直接导入你们分享的完整数据库导出文件，例如 `food_recommend.sql`
-
-如果你拿到的是压缩包，例如 `food_recommend.sql.gz`，请先解压再导入。
-
-命令行导入示例：
-
-```bash
-mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS food_recommend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -uroot -p food_recommend < food_recommend.sql
-```
-
-如果分享包里的文件名不是 `food_recommend.sql`，把上面的文件名替换成实际文件名即可。
-
-如果导入的是较旧备份，还要补执行当前仓库内的增量数据库补丁：
+优先导入完整 `food_recommend` 数据库备份；如果备份偏旧，再补执行：
 
 ```bash
 mysql -uroot -p food_recommend < backend/let-me-cook/src/main/resources/db/migration/V6__daily_recommendation_comment_patch.sql
 ```
 
-这份补丁会补齐：
+### 3. Windows 一键拉起最新前后端
 
-- `daily_recipe_recommendations`
-- `daily_recommend_job_runs`
-- 各属性表 `recipe_count` 字段和索引
-- 评论性能相关索引
-- 评论插入触发器的增量统计逻辑
-
-如果你更习惯图形界面，也可以用 Navicat / DataGrip / MySQL Workbench 直接导入整库备份。
-
-备用方案才是手动执行 `schema.sql + data.sql`：
-
-```bash
-mysql -uroot -p -e "CREATE DATABASE IF NOT EXISTS food_recommend DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-mysql -uroot -p food_recommend < backend/let-me-cook/src/main/resources/schema.sql
-mysql -uroot -p food_recommend < backend/let-me-cook/src/main/resources/data.sql
-```
-
-说明：
-
-- 如果已经拿到完整数据库备份，**不要重复导入** `schema.sql` / `data.sql`
-- `schema.sql` 负责建表
-- `data.sql` 负责写入基础数据和默认账号
-- `schema.sql + data.sql` 只作为没有完整数据库备份时的兜底初始化方式
-
-### 3. 启动后端
-
-```bash
-cd backend/let-me-cook
-mvn spring-boot:run
-```
-
-启动后默认监听：
-
-- 后端：`http://127.0.0.1:8081`
-
-可用接口自检：
-
-```bash
-curl http://127.0.0.1:8081/api/categories
-```
-
-### 4. 启动前端
+首次启动前，请先在 [快速启动指南.md](./快速启动指南.md) 中完成数据库导入，并至少执行一次前端依赖安装：
 
 ```bash
 cd frontend
 npm install
-npm run dev
 ```
 
-启动后默认监听：
-
-- 前端：`http://127.0.0.1:3000`
-
-常用页面：
-
-- 首页：`http://127.0.0.1:3000`
-- 管理员登录：`http://127.0.0.1:3000/admin/login`
-- 推荐页：`http://127.0.0.1:3000/recommend`
-
-### 5. 默认账号
-
-如果你已经导入了完整数据库备份，或手动导入了 `data.sql`，可以直接使用：
-
-- 管理员：`admin / 123456`
-- 测试用户：`testuser / 123456`
-
-## 启动成功判定
-
-如果下面 4 条都成立，说明别人基本已经本地跑通了：
-
-1. 后端接口可访问：
-   - 打开 `http://127.0.0.1:8081/api/categories`
-   - 能看到 JSON 返回，不是 500/404
-2. 前端首页可访问：
-   - 打开 `http://127.0.0.1:3000`
-3. 管理员登录页可访问：
-   - 打开 `http://127.0.0.1:3000/admin/login`
-4. 默认管理员可登录：
-   - `admin / 123456`
-
-## 当前推荐的本地开发口径
-
-第一次接手仓库，最推荐先按下面这条链路跑：
-
-1. 本地 MySQL
-2. 后端本地 `8081`
-3. 前端 Vite 本地 `3000`
-
-这是最容易排障、最不容易被 Docker 旧容器干扰的方式。
-
-## 可选：开启 Elasticsearch 完整体验搜索
-
-如果你想体验当前的 Search V2，而不只是最小可运行状态：
-
-### 1. 启动 ES
-
-```bash
-docker compose up -d elasticsearch
-```
-
-ES 默认端口：
-
-- `http://127.0.0.1:9200`
-
-### 2. 用 ES 模式启动后端
-
-macOS / Linux:
-
-```bash
-export SEARCH_ENGINE=elasticsearch
-mvn -f backend/let-me-cook/pom.xml spring-boot:run
-```
-
-PowerShell:
+随后可在仓库根目录执行：
 
 ```powershell
-$env:SEARCH_ENGINE='elasticsearch'
-cd backend/let-me-cook
-mvn spring-boot:run
+powershell -ExecutionPolicy Bypass -File .\run-latest-dev.ps1
 ```
 
-### 3. 首次重建搜索索引
+脚本会：
 
-启动后登录管理后台：
+- 停掉本仓库占用 `3000/8081` 的旧前后端进程
+- 停掉名为 `food-frontend`、`food-backend` 的旧容器
+- 若前端依赖缺失，会先自动执行一次 `npm install`
+- 以后端源码方式启动最新代码，并显式使用：
+  - `ALIYUN_OSS_ENABLED=false`
+  - `SEARCH_ENGINE=auto`
+- 以前端 Vite 开发服务方式启动最新代码
+- 把日志写到 `temp/` 目录
 
-- `http://127.0.0.1:3000/admin/login`
+停止脚本：
 
-然后在数据看板里触发一次“搜索索引重建”。不做这一步，ES 能连上，但搜索索引里还没有数据。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\stop-latest-dev.ps1
+```
 
-## 当前默认端口一览
+### 4. 手动启动
 
-- 前端 Vite：`3000`
-- 后端：`8081`
-- Elasticsearch：`9200`
+手动启动步骤、数据库导入细节、ES 启用方式、常见报错与自检项统一放在 [快速启动指南.md](./快速启动指南.md)。
 
-说明：
+### 5. 本地 Docker 启动
 
-- 团队当前也经常使用 Docker 前端 `5173` 作为演示端口
-- 但对第一次从 GitHub 拉项目的人来说，**最推荐先用 `3000 + 8081` 跑通**
+如果你想直接验证当前 Docker 启动链路，可以在仓库根目录执行：
 
-## 最容易卡住的 4 个点
+```powershell
+Copy-Item .env.docker.example .env.docker
+docker compose --env-file .env.docker -f .\docker-compose.yml up -d --build
+```
 
-1. `spring.sql.init.mode=never`
-   这意味着后端**不会自动帮你导入数据库结构或种子数据**。
+当前本地 Docker 口径：
 
-2. 根目录不是独立的管理端项目
-   用户端和管理端都在 `frontend/`。
+- 前端默认对外：`3000`
+- 后端默认对外：`8081`
+- Elasticsearch 默认对外：`9200`
+- 前端容器内部直接反向代理到 `backend:8081`
+- 本地默认 `SEARCH_ENGINE=auto`
+- 本地默认 `ALIYUN_OSS_ENABLED=false`
 
-3. 默认搜索引擎是 `elasticsearch`
-   默认优先走 Elasticsearch；ES 不可用或索引未就绪时会自动回退 MySQL。
+## 当前技术栈
 
-4. 前端默认端口不是 `5173`
-   `npm run dev` 默认是 `3000`；`5173` 是当前团队常用的 Docker 前端演示端口。
+- 前端：Vue 3 + Vite 5 + Element Plus + Pinia + Axios + ECharts
+- 后端：Spring Boot 3.2.2 + MyBatis + MySQL 8
+- 搜索：Elasticsearch Search V2
+- 推荐：离线 `Top100` + 实时个性化推荐混合链路
+- Java：21
+- Node.js：18+
 
-## 常用文档
+## 仓库结构
 
-- [快速启动指南.md](./快速启动指南.md)
-- [agent.md](./agent.md)
-- [docs/README.md](./docs/README.md)
-- [项目全景开发手册.md](./docs/02-开发文档/项目全景开发手册.md)
-- [API 接口文档.md](./docs/03-API/API%20接口文档.md)
-- [数据库设计文档.md](./docs/05-数据库文档/数据库设计文档.md)
+```text
+foodrec-merged-run/
+├── backend/let-me-cook/                 # Spring Boot 后端
+├── frontend/                            # 用户端 + 管理后台
+├── docs/                                # 专题文档
+├── infra/elasticsearch/                 # ES smartcn 镜像
+├── scripts/                             # 辅助脚本
+├── local_top100_cke_full/               # 离线 Top100 说明、源码入口、模型清单
+├── run-latest-dev.ps1                   # Windows 源码直启脚本
+├── stop-latest-dev.ps1                  # Windows 停止脚本
+├── temp/                                # 本地运行日志与 PID
+├── agent.md                             # 项目交接总文档
+├── 快速启动指南.md                       # 启动、自检、常见问题
+└── docker-compose.yml                   # 开发期容器编排
+```
+
+## 离线推荐资产
+
+仓库内当前保留：
+
+- `local_top100_cke_full/README.md`
+- `local_top100_cke_full/cke_full_source/`
+- `local_top100_cke_full/knowledge_graph_source/`
+- `local_top100_cke_full/selected_model_manifest.json`
+
+普通 Git 不随仓库同步的大文件仍包括：
+
+- 模型权重
+- 大型缓存
+- 运行工件
+- 大体量离线结果文件
+
+## 文档维护约定
+
+- 启动步骤只保留在 [快速启动指南.md](./快速启动指南.md)
+- 架构与运行链路只保留在 [项目全景开发手册.md](./docs/02-开发文档/项目全景开发手册.md)
+- 对外接口语义只保留在 [API 接口文档.md](./docs/03-API/API%20接口文档.md)
+- 迭代时间线只保留在 [升级迭代记录.md](./docs/02-开发文档/升级迭代记录.md)
+
+如果发现同一说明在多个文档重复出现，优先删掉副本，保留一份主文档。
