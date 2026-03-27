@@ -40,26 +40,39 @@ const handleSelect = (mode) => {
 .scene-top-nav {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 6px;
+  padding: 4px 6px;
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
   border-radius: 999px;
   border: 1px solid var(--border-color);
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
   transition: all var(--transition);
+  scrollbar-width: none;
+}
+
+.scene-top-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .scene-mode-tab {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 36px;
-  padding: 0 12px;
+  gap: 4px;
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  height: 32px;
+  padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
   color: var(--text-regular);
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   transition: all 0.28s ease;
 }
@@ -74,16 +87,47 @@ const handleSelect = (mode) => {
   border-color: transparent;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
   color: #fff;
-  transform: scale(1.04);
+  transform: scale(1.02);
   box-shadow: var(--mode-card-glow, var(--shadow-sm));
 }
 
 .mode-emoji {
   line-height: 1;
-  font-size: 15px;
+  font-size: 13px;
 }
 
 .mode-label {
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1440px) {
+  .scene-top-nav {
+    gap: 4px;
+    padding: 4px;
+  }
+
+  .scene-mode-tab {
+    gap: 3px;
+    padding: 0 6px;
+    font-size: 11px;
+  }
+
+  .mode-emoji {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 1180px) {
+  .scene-mode-tab {
+    padding: 0 5px;
+    font-size: 10.5px;
+  }
+
+  .mode-emoji {
+    display: none;
+  }
 }
 </style>

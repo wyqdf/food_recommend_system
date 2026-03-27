@@ -273,8 +273,8 @@ mvn spring-boot:run
 2. 根目录不是独立的管理端项目
    用户端和管理端都在 `frontend/`。
 
-3. 默认搜索引擎是 `auto`
-   ES 可用时自动走 Elasticsearch，不可用时自动回退 MySQL。
+3. 默认搜索引擎是 `elasticsearch`
+   默认优先走 Elasticsearch；ES 不可用或索引未就绪时会自动回退 MySQL。
 
 4. 前端默认端口不是 `5173`
    `npm run dev` 默认是 `3000`；`5173` 是当前团队常用的 Docker 前端演示端口。

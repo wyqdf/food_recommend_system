@@ -73,7 +73,9 @@ public final class SceneTagResolver {
         List<String> normalizedCategories = categories == null ? List.of() : categories;
         List<String> normalizedIngredients = ingredients == null ? List.of() : ingredients;
 
-        if (containsAny(time, "10", "15", "20")) {
+        if (isQuickTime(time)
+                || containsAny(normalizedTitle, "快手", "速食", "速做", "懒人")
+                || containsAnyList(normalizedCategories, "快手菜", "便当")) {
             codes.add("quick");
         }
         if (isDietRecipe(normalizedTitle, normalizedCategories, normalizedIngredients, taste)) {
@@ -104,9 +106,6 @@ public final class SceneTagResolver {
             codes.add("with_rice");
         }
 
-        if (codes.isEmpty()) {
-            codes.add("family");
-        }
         return new ArrayList<>(codes);
     }
 
@@ -123,12 +122,16 @@ public final class SceneTagResolver {
                 recipe.getTaste()).contains(sceneCode.trim().toLowerCase(Locale.ROOT));
     }
 
+    public static boolean isQuickTime(String timeText) {
+        Integer minutes = parseMinutes(timeText);
+        return minutes != null && minutes <= 20;
+    }
+
     private static boolean isDietRecipe(String title, List<String> categories, List<String> ingredients, String taste) {
         boolean explicitSignal = containsAny(title, "减脂", "轻食", "低卡", "健身餐", "沙拉", "高蛋白")
                 || containsAnyList(categories, "减脂", "轻食", "健身", "沙拉", "瘦身");
 
-        boolean leanProteinSignal = containsAnyList(ingredients,
-                "鸡胸", "鸡胸肉", "虾", "虾仁", "鳕鱼", "鱼片", "金枪鱼", "三文鱼", "蛋白", "豆腐", "魔芋", "牛腱");
+        boolean leanProteinSignal = containsDietFriendlyProtein(ingredients);
         boolean vegetableSignal = containsAnyList(ingredients,
                 "生菜", "西兰花", "黄瓜", "番茄", "圣女果", "紫甘蓝", "菠菜", "苦瓜", "玉米粒", "蘑菇");
         boolean cleanTasteSignal = containsAny(taste, "清淡", "原味");
@@ -137,12 +140,116 @@ public final class SceneTagResolver {
 
         boolean heavyTitleSignal = containsAny(title,
                 "红烧", "糖醋", "可乐", "干锅", "回锅", "香酥", "油焖", "炸", "排骨", "肘子", "猪蹄", "扣肉", "宫保", "鱼香",
-                "炒饭", "锅贴", "蛋饼", "煎饼", "油条", "年糕");
+                "炒饭", "煲仔饭", "焖饭", "盖饭", "锅贴", "饺子", "蒸饺", "包子", "馄饨", "蛋饼", "煎饼", "油条", "年糕",
+                "肉丝", "肉卷");
         boolean heavyIngredientSignal = containsAnyList(ingredients,
-                "排骨", "猪蹄", "五花肉", "肥牛", "肥羊", "腊肉", "培根", "香肠", "腊肠", "火腿", "年糕", "沙拉酱", "奶油", "黄油");
+                "排骨", "猪蹄", "五花肉", "猪肉", "猪里脊", "猪里脊肉", "肥牛", "肥羊", "腊肉", "培根", "香肠", "腊肠",
+                "火腿", "年糕", "糯米", "面粉", "饺子皮", "豆腐皮", "油豆腐", "豆腐泡", "沙拉酱", "奶油", "黄油",
+                "甜面酱", "蚝油");
         boolean heavyTasteSignal = containsAny(taste, "甜味", "酸甜");
 
         return positive && !(heavyTitleSignal || heavyIngredientSignal || heavyTasteSignal);
+    }
+
+    private static boolean containsDietFriendlyProtein(List<String> ingredients) {
+        if (ingredients == null || ingredients.isEmpty()) {
+            return false;
+        }
+        for (String ingredient : ingredients) {
+            if (ingredient == null || ingredient.isBlank()) {
+                continue;
+            }
+            if (containsAny(ingredient, "鸡胸", "鸡胸肉", "虾", "虾仁", "鳕鱼", "鱼片", "金枪鱼", "三文鱼", "蛋白", "魔芋", "牛腱")) {
+                return true;
+            }
+            if (ingredient.contains("豆腐")
+                    && !containsAny(ingredient, "豆腐皮", "油豆腐", "豆腐泡", "腐竹")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static Integer parseMinutes(String timeText) {
+        if (timeText == null || timeText.isBlank()) {
+            return null;
+        }
+        String text = timeText.replaceAll("\\s+", "");
+        if (text.contains("半小时")) {
+            return 30;
+        }
+        if (text.contains("一刻钟")) {
+            return 15;
+        }
+        if (text.contains("三刻钟")) {
+            return 45;
+        }
+        if (text.contains("数天")) {
+            return 24 * 60;
+        }
+        if (text.contains("一天")) {
+            return 24 * 60;
+        }
+        if (text.contains("数小时")) {
+            return 3 * 60;
+        }
+
+        if (text.contains("小时")) {
+            Integer hour = parseNumberToken(text.substring(0, text.indexOf("小时")));
+            return hour == null ? null : hour * 60;
+        }
+        if (text.contains("分钟")) {
+            return parseNumberToken(text.substring(0, text.indexOf("分钟")));
+        }
+        if (text.endsWith("分")) {
+            return parseNumberToken(text.substring(0, text.length() - 1));
+        }
+
+        return parseNumberToken(text);
+    }
+
+    private static Integer parseNumberToken(String token) {
+        if (token == null || token.isBlank()) {
+            return null;
+        }
+        String normalized = token.trim()
+                .replace("兩", "二")
+                .replace("两", "二")
+                .replace("廿", "二十");
+        if (normalized.matches("\\d+")) {
+            return Integer.parseInt(normalized);
+        }
+        if (normalized.equals("半")) {
+            return null;
+        }
+        if (normalized.contains("十")) {
+            int idx = normalized.indexOf("十");
+            String tensPart = normalized.substring(0, idx);
+            String onesPart = normalized.substring(idx + 1);
+            Integer tens = tensPart.isEmpty() ? 1 : chineseDigit(tensPart);
+            Integer ones = onesPart.isEmpty() ? 0 : chineseDigit(onesPart);
+            if (tens == null || ones == null) {
+                return null;
+            }
+            return tens * 10 + ones;
+        }
+        return chineseDigit(normalized);
+    }
+
+    private static Integer chineseDigit(String text) {
+        return switch (text) {
+            case "零" -> 0;
+            case "一" -> 1;
+            case "二" -> 2;
+            case "三" -> 3;
+            case "四" -> 4;
+            case "五" -> 5;
+            case "六" -> 6;
+            case "七" -> 7;
+            case "八" -> 8;
+            case "九" -> 9;
+            default -> null;
+        };
     }
 
     private static boolean containsAny(String text, String... keys) {

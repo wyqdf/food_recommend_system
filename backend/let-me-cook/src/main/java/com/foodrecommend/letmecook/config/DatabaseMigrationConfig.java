@@ -52,10 +52,13 @@ public class DatabaseMigrationConfig {
             addIndexIfNotExists("idx_recipes_status_rating_count", "recipes", "status, rating_count DESC, id DESC");
             addIndexIfNotExists("idx_recipes_admin_create_time", "recipes", "create_time DESC, id DESC");
             addIndexIfNotExists("idx_interaction_user_type", "interactions", "user_id, interaction_type");
+            addIndexIfNotExists("idx_interactions_user_recipe_type", "interactions", "user_id, recipe_id, interaction_type");
+            addIndexIfNotExists("idx_interactions_user_type_time_recipe", "interactions", "user_id, interaction_type, create_time DESC, id DESC, recipe_id");
             addIndexIfNotExists("idx_interactions_create_time_type", "interactions", "create_time DESC, interaction_type");
             addIndexIfNotExists("idx_user_create_time", "users", "create_time DESC");
             addIndexIfNotExists("idx_users_status_create_time", "users", "status, create_time DESC, id DESC");
             addIndexIfNotExists("idx_recipe_author_uid", "recipes", "author_uid");
+            addIndexIfNotExists("idx_recipe_ingredients_ing_type_recipe", "recipe_ingredients", "ingredient_id, ingredient_type, recipe_id");
             addIndexIfNotExists("idx_behavior_user_time", "behavior_events", "user_id, create_time DESC, id DESC, recipe_id");
             addIndexIfNotExists("idx_behavior_event_time", "behavior_events", "event_type, create_time DESC");
             addIndexIfNotExists("idx_behavior_recipe_time", "behavior_events", "recipe_id, create_time DESC");

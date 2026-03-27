@@ -158,7 +158,7 @@ flowchart LR
 
 - 默认后端端口是 `8081`
 - 默认数据库连接是 `jdbc:mysql://localhost:3306/food_recommend`
-- 仓库默认 `search.engine=${SEARCH_ENGINE:auto}`
+- 仓库默认 `search.engine=${SEARCH_ENGINE:elasticsearch}`
 - 仓库默认 ES 地址是 `http://127.0.0.1:9200`
 - 仓库默认 OSS 本地关闭：`aliyun.oss.enabled=false`
 
@@ -167,7 +167,7 @@ flowchart LR
 这个项目有一组非常重要的“默认值 != 当前运行态”的差异：
 
 - **搜索开关**
-  - 仓库默认：`search.engine=auto`
+  - 仓库默认：`search.engine=elasticsearch`
   - 当前本地运行态：ES 可用时自动切到 `elasticsearch`
 - **前端端口**
   - Vite 默认：`3000`
@@ -400,7 +400,7 @@ flowchart LR
 
 重要事实：
 
-- 仓库默认 `search.engine=auto`
+- 仓库默认 `search.engine=elasticsearch`
 - 当前本地运行态已切到 `elasticsearch`
 
 ### 7.2 推荐现状
@@ -434,7 +434,7 @@ flowchart LR
 - 当前后端行为：
   - 对登录用户，如果 `type=personal` 或 `type=daily`
   - 会先查 `daily_recipe_recommendations`
-  - 如果该用户当天存在离线 `Top100`
+  - 如果该用户存在最近一批可用的离线 `Top100`
     - 优先返回这批离线结果
   - 如果不存在
     - 回退现有实时推荐
@@ -1343,7 +1343,7 @@ Invoke-WebRequest -UseBasicParsing "http://127.0.0.1:8081/api/recipes/search?key
    - 做索引判断时要注意不要误删
 
 6. **搜索运行态与仓库默认配置不同**
-   - 当前默认配置已改成 `auto`
+   - 当前默认配置已改成 `elasticsearch`
    - 启动时优先检测 Elasticsearch，读索引就绪就自动使用 ES
    - 若 ES 不可用或 alias 未就绪，则自动回退 MySQL
    - 当前本地常用运行态已是 `elasticsearch`

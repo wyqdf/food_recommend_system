@@ -1765,7 +1765,7 @@ Authorization: Bearer <admin_token>
 
 **说明**:
 
-- 当前仓库默认配置仍为 `engine=mysql`，但本地运行中的宿主机后端已切到 `engine=elasticsearch`。
+- 当前仓库默认配置现为 `engine=elasticsearch`；若 ES 不可读，搜索请求仍会自动回退到 `engine=mysql`。
 - 当前重建任务会显式创建目标索引，再通过 alias 原子切换到新索引版本。
 - 即使仍处于 `mysql` 引擎，也可以先通过该接口查看 ES 索引初始化情况与最近错误。
 

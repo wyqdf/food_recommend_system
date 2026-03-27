@@ -24,7 +24,7 @@
     </div>
     <div class="recipe-info">
       <h3 class="recipe-title">{{ recipe.title || recipe.name }}</h3>
-      <p v-if="recipe.reasons?.length" class="recommend-reason">{{ recipe.reasons[0] }}</p>
+      <p v-if="displayReason" class="recommend-reason">{{ displayReason }}</p>
       <p class="recipe-author">
         <el-icon>
           <User />
@@ -73,6 +73,18 @@ const route = useRoute()
 const defaultImage = '/images/food-placeholder.svg'
 const displayTime = computed(() => props.recipe.timeCostName || props.recipe.time || '未知')
 const displayDifficulty = computed(() => props.recipe.difficultyName || props.recipe.difficulty || '')
+const displayReason = computed(() => {
+  const reasons = Array.isArray(props.recipe.reasons)
+    ? props.recipe.reasons.filter(reason => typeof reason === 'string' && reason.trim())
+    : []
+  if (reasons.length === 0) {
+    return ''
+  }
+  if (reasons.length === 1) {
+    return reasons[0]
+  }
+  return reasons[Math.floor(Math.random() * reasons.length)]
+})
 
 const goDetail = () => {
   trackBehavior('recipe_click', {

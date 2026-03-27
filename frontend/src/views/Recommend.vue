@@ -40,7 +40,7 @@
       </el-tabs>
     </div>
 
-    <div v-if="activeTab === 'personal' && categoryOptions.length" class="scene-filter">
+    <div v-if="activeTab === 'hot' && categoryOptions.length" class="scene-filter">
       <span class="scene-label">分类筛选：</span>
       <el-segmented v-model="selectedCategoryId" :options="categorySegmentOptions" @change="fetchRecommend" />
     </div>
@@ -90,7 +90,7 @@ const loadCategories = async () => {
 }
 
 const fetchRecommend = async () => {
-  const categoryKey = activeTab.value === 'personal' ? selectedCategoryId.value || 'all' : 'all'
+  const categoryKey = activeTab.value === 'hot' ? selectedCategoryId.value || 'all' : 'all'
   const cacheKey = `${activeTab.value}_${categoryKey}_${currentMode.value}_12`
   if (cache.has(cacheKey)) {
     recipeList.value = cache.get(cacheKey)
@@ -100,13 +100,15 @@ const fetchRecommend = async () => {
   loading.value = true
   try {
     const params = { type: activeTab.value, limit: 12, mode: currentMode.value }
-    if (activeTab.value === 'personal' && selectedCategoryId.value) {
+    if (activeTab.value === 'hot' && selectedCategoryId.value) {
       params.categoryId = selectedCategoryId.value
     }
     const res = await recipeApi.getRecommend(params)
     recipeList.value = res.data.list || []
     cache.set(cacheKey, recipeList.value)
-    const selectedCategoryName = categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
+    const selectedCategoryName = activeTab.value === 'hot'
+      ? categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
+      : null
     trackBehavior('recommend_request', {
       sourcePage: 'recommend',
       sceneCode: null,

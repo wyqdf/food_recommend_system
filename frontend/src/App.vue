@@ -13,7 +13,7 @@
           </el-button>
           <div class="logo" @click="$router.push('/')">
             <div class="logo-icon">
-              <el-icon :size="24">
+              <el-icon :size="22">
                 <Food />
               </el-icon>
             </div>
@@ -66,7 +66,7 @@
             <template v-if="userStore.isLoggedIn">
               <el-dropdown trigger="click">
                 <div class="user-info">
-                  <el-avatar :size="36" class="user-avatar">{{ userStore.user?.username?.charAt(0) || 'U' }}</el-avatar>
+                  <el-avatar :size="34" class="user-avatar">{{ userStore.user?.username?.charAt(0) || 'U' }}</el-avatar>
                   <span class="user-name">{{ userStore.user?.username || '用户' }}</span>
                 </div>
                 <template #dropdown>
@@ -335,13 +335,14 @@ watch(() => userStore.user, (user) => {
 }
 
 .header-content {
-  max-width: var(--page-width);
+  max-width: 1380px;
   margin: 0 auto;
   height: 100%;
   display: flex;
   align-items: center;
-  padding: 0 22px;
-  gap: 12px;
+  padding: 0 18px;
+  gap: 8px;
+  min-width: 0;
 }
 
 .mobile-menu-btn {
@@ -353,7 +354,7 @@ watch(() => userStore.user, (user) => {
 .logo {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   cursor: pointer;
   transition: var(--transition);
   flex-shrink: 0;
@@ -364,8 +365,8 @@ watch(() => userStore.user, (user) => {
 }
 
 .logo-icon {
-  width: 38px;
-  height: 38px;
+  width: 34px;
+  height: 34px;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
   border-radius: var(--radius-sm);
   display: flex;
@@ -375,7 +376,7 @@ watch(() => userStore.user, (user) => {
 }
 
 .logo-text {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--primary-color), var(--primary-light));
   -webkit-background-clip: text;
@@ -387,19 +388,27 @@ watch(() => userStore.user, (user) => {
 }
 
 .nav-menu {
-  flex: 1;
+  flex: 1 1 320px;
   border-bottom: none;
-  margin-left: 24px;
+  margin-left: 10px;
   background: transparent;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .nav-menu .el-menu-item {
   height: 66px;
   line-height: 66px;
-  font-size: 14px;
+  font-size: 12px;
   font-weight: 500;
+  padding: 0 8px;
   border-bottom: 3px solid transparent;
   transition: var(--transition);
+}
+
+.nav-menu :deep(.el-menu-item .el-icon) {
+  margin-right: 3px;
+  font-size: 14px;
 }
 
 .nav-menu .el-menu-item:hover {
@@ -409,35 +418,49 @@ watch(() => userStore.user, (user) => {
 .header-right {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 10px;
+  margin-left: auto;
+  min-width: 0;
+  flex: 0 1 auto;
 }
 
 .header-scene-mode {
-  flex-shrink: 0;
+  flex: 0 1 390px;
+  min-width: 0;
+  max-width: min(390px, 30vw);
+  overflow: hidden;
+}
+
+.header-scene-mode :deep(.scene-top-nav) {
+  width: 100%;
 }
 
 .search-wrapper {
-  width: min(420px, 36vw);
+  width: clamp(130px, 15vw, 220px);
+  min-width: 0;
+  flex: 0 1 220px;
 }
 
 .search-wrapper :deep(.el-input__wrapper) {
   border-radius: 20px;
-  padding: 0 15px;
+  padding: 0 12px;
 }
 
 .search-wrapper :deep(.search-entry__button) {
   border-radius: 20px;
-  padding: 8px 18px;
+  padding: 8px 16px;
 }
 
 .user-info {
   cursor: pointer;
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
+  gap: 6px;
+  padding: 4px 6px;
   border-radius: 20px;
   transition: var(--transition);
+  min-width: 0;
+  max-width: 120px;
 }
 
 .user-info:hover {
@@ -451,14 +474,19 @@ watch(() => userStore.user, (user) => {
 }
 
 .user-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   color: var(--text-primary);
+  max-width: 64px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
 }
 
 .login-btn {
   border-radius: 20px;
-  padding: 10px 24px;
+  padding: 8px 16px;
 }
 
 .app-main {
@@ -617,17 +645,71 @@ watch(() => userStore.user, (user) => {
   padding: 0;
 }
 
-@media (max-width: 1100px) {
-  .nav-menu {
-    margin-left: 10px;
-  }
-
-  .search-wrapper {
-    width: min(360px, 34vw);
+@media (max-width: 1440px) {
+  .header-content {
+    padding: 0 14px;
+    gap: 6px;
   }
 
   .logo-text {
-    font-size: 18px;
+    font-size: 17px;
+  }
+
+  .nav-menu {
+    margin-left: 8px;
+  }
+
+  .nav-menu .el-menu-item {
+    padding: 0 7px;
+    font-size: 11.5px;
+  }
+
+  .header-scene-mode {
+    flex-basis: 350px;
+    max-width: min(350px, 29vw);
+  }
+
+  .search-wrapper {
+    width: clamp(120px, 13vw, 190px);
+    flex-basis: 190px;
+  }
+
+  .user-info {
+    max-width: 42px;
+    padding: 4px;
+    justify-content: center;
+  }
+
+  .user-name {
+    display: none;
+  }
+}
+
+@media (max-width: 1180px) {
+  .nav-menu {
+    margin-left: 6px;
+  }
+
+  .search-wrapper {
+    width: clamp(112px, 12vw, 160px);
+    flex-basis: 160px;
+  }
+
+  .logo-text {
+    font-size: 16px;
+  }
+
+  .header-scene-mode {
+    flex-basis: 300px;
+    max-width: min(300px, 26vw);
+  }
+
+  .header-right {
+    gap: 6px;
+  }
+
+  .nav-menu .el-menu-item {
+    padding: 0 6px;
   }
 }
 

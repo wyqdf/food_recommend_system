@@ -10,8 +10,8 @@
 
 - 本地开发默认后端端口为 `8081`。
 - 搜索接口当前支持两套后端实现：
+  - `search.engine=elasticsearch`：当前仓库默认值，优先走 ES 检索；若 ES 不可读则自动回退 MySQL
   - `search.engine=auto`：启动时优先检测 Elasticsearch，可用时走 ES，不可用时自动回退 MySQL
-  - `search.engine=elasticsearch`：切换到 Elasticsearch 检索，再回 MySQL 补全展示字段
 - 搜索能力当前已升级为 Search V2：
   - `GET /recipes/search` 新增 `sort` 参数，支持 `relevance`、`hot`、`new`
   - Elasticsearch 路径使用 `smartcn` 中文分词
@@ -19,7 +19,7 @@
   - 意图字段（口味、做法、耗时、难度）仅在核心召回无结果时作为 fallback
   - 新增 `GET /recipes/search/suggestions`
 - Elasticsearch 建议词已改为独立 completion 字段，不再复用主搜索字段
-- 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置现为 `auto`
+- 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置现为 `elasticsearch`
 - 以下列表型接口返回项已统一补充作者字段：
   - `GET /recipes`
   - `GET /recipes/search`
@@ -29,6 +29,7 @@
   - `GET /recipes/recommend` 新增可选 `categoryId`
   - 推荐页前端分类筛选已改成调用 `GET /categories/recommend?limit=10` 动态读取前 10 热门分类
   - `type=personal` 命中离线 `Top100` 时，不再完全覆盖实时推荐；当前口径是“离线模型结果 + 严格分类实时推荐”混合返回
+  - 离线 `Top100` 不再要求 `biz_date=当天`；当前会优先命中该用户最近一批可用离线结果
   - 当用户选择分类时，混合结果中实时推荐部分会严格按 `categoryId` 过滤
   - 混合结果返回前会打乱顺序
   - 推荐页前端不再缓存 `personal` 结果，分类切换时实时推荐部分允许变化

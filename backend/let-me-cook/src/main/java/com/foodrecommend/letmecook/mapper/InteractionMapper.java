@@ -14,7 +14,7 @@ public interface InteractionMapper {
     @Delete("DELETE FROM interactions WHERE user_id = #{userId} AND recipe_id = #{recipeId} AND interaction_type = 'favorite'")
     int deleteFavorite(@Param("userId") Integer userId, @Param("recipeId") Integer recipeId);
 
-    @Select("SELECT COUNT(*) FROM interactions WHERE user_id = #{userId} AND recipe_id = #{recipeId} AND interaction_type = 'favorite'")
+    @Select("SELECT EXISTS(SELECT 1 FROM interactions WHERE user_id = #{userId} AND recipe_id = #{recipeId} AND interaction_type = 'favorite')")
     boolean existsFavorite(@Param("userId") Integer userId, @Param("recipeId") Integer recipeId);
 
     @Select("SELECT recipe_id FROM interactions WHERE user_id = #{userId} AND interaction_type = 'favorite' ORDER BY create_time DESC, id DESC")

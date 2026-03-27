@@ -56,6 +56,22 @@
               </el-button>
             </el-form-item>
           </el-form>
+          <div class="demo-users">
+            <div class="demo-users__header">
+              <h3>展示用户</h3>
+              <p>以下 5 个账号用于演示 Top100 推荐效果，密码统一为 <strong>123456</strong></p>
+            </div>
+            <button
+              v-for="user in demoUsers"
+              :key="user.username"
+              type="button"
+              class="demo-user"
+              @click="fillDemoUser(user.username)"
+            >
+              <span class="demo-user__name">{{ user.username }}</span>
+              <span class="demo-user__style">{{ user.style }}</span>
+            </button>
+          </div>
           <div class="register-link">
             还没有账号？<router-link to="/register">立即注册</router-link>
           </div>
@@ -79,6 +95,13 @@ const formRef = ref()
 const loading = ref(false)
 const rememberMe = ref(false)
 const autoLogin = ref(false)
+const demoUsers = [
+  { username: '好吃好吃难做', style: '减脂一人食' },
+  { username: '梅依旧', style: '快手家常' },
+  { username: '千惠烘焙', style: '烘焙甜点' },
+  { username: '小红马', style: '儿童辅食' },
+  { username: 'littlelittle', style: '早餐面点' }
+]
 
 const form = reactive({
   username: '',
@@ -88,6 +111,11 @@ const form = reactive({
 const rules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+}
+
+const fillDemoUser = (username) => {
+  form.username = username
+  form.password = '123456'
 }
 
 const handleLogin = async () => {
@@ -259,6 +287,73 @@ onMounted(() => {
   border-radius: 12px;
 }
 
+.demo-users {
+  margin-top: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff7f1;
+  border: 1px solid #f6d8c6;
+}
+
+.demo-users__header {
+  margin-bottom: 12px;
+}
+
+.demo-users__header h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.demo-users__header p {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.demo-user {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border-radius: 12px;
+  border: 1px solid #f0d2bf;
+  background: #fff;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.demo-user:last-child {
+  margin-bottom: 0;
+}
+
+.demo-user:hover {
+  transform: translateY(-1px);
+  border-color: #e85d2a;
+  box-shadow: 0 8px 20px rgba(232, 93, 42, 0.12);
+}
+
+.demo-user__name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.demo-user__style {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #fff0e8;
+  color: #d65523;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .form-options {
   display: flex;
   justify-content: space-between;
@@ -308,6 +403,10 @@ onMounted(() => {
     font-size: 24px;
   }
 
+  .demo-users {
+    margin-top: 16px;
+  }
+
   .login-features {
     flex-direction: row;
     flex-wrap: wrap;
@@ -342,6 +441,11 @@ onMounted(() => {
     flex-wrap: wrap;
     gap: 8px 16px;
     margin-bottom: 14px;
+  }
+
+  .demo-user {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .feature-item {

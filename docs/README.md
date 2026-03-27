@@ -70,9 +70,9 @@ docs/
 - 前端默认开发端口来自 [vite.config.js](../frontend/vite.config.js) 的 `3000`；若本地用命令行显式指定 `5173`，以实际启动端口为准。
 - 后端默认端口为 `8081`，见 [application.properties](../backend/let-me-cook/src/main/resources/application.properties)。
 - 本地默认关闭 OSS：`aliyun.oss.enabled=false`。
-- 搜索引擎当前仓库默认值已改为 `search.engine=auto`：
-  - ES 可用且索引/alias 就绪时自动使用 `elasticsearch`
-  - 否则自动回退 `mysql`
+- 搜索引擎当前仓库默认值已改为 `search.engine=elasticsearch`：
+  - 默认优先使用 `elasticsearch`
+  - 若 ES 不可用或索引/alias 未就绪，则自动回退 `mysql`
 - 本地已于 `2026-03-19 10:30` 完成 Search V2 验收：
   - `analysis-smartcn 8.12.2` 插件可用
   - 别名 `recipes_search` 当前指向 `recipes_search_v2`
