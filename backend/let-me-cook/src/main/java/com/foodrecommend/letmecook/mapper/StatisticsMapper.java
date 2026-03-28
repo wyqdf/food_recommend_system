@@ -4,6 +4,7 @@ import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import org.apache.ibatis.annotations.Select;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +23,7 @@ public interface StatisticsMapper {
     @Select("SELECT COUNT(*) FROM comments")
     int countTotalComments();
 
-    @Select("SELECT COUNT(*) FROM interactions WHERE create_time >= CURDATE()")
+    @Select("SELECT COUNT(*) FROM behavior_events WHERE event_type = 'recipe_view' AND create_time >= CURDATE()")
     int countTodayViews();
 
     @Select("SELECT COUNT(*) FROM users WHERE create_time >= CURDATE()")
@@ -42,6 +43,17 @@ public interface StatisticsMapper {
 
     @Select("<script>" +
             "SELECT DATE_FORMAT(create_time, '%Y-%m-%d') as date, COUNT(*) as count " +
+            "FROM users " +
+            "WHERE create_time &gt;= #{startTime} " +
+            "AND create_time &lt; #{endTimeExclusive} " +
+            "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') " +
+            "ORDER BY date" +
+            "</script>")
+    List<Map<String, Object>> getUserTrendByDateRange(@Param("startTime") LocalDateTime startTime,
+                                                      @Param("endTimeExclusive") LocalDateTime endTimeExclusive);
+
+    @Select("<script>" +
+            "SELECT DATE_FORMAT(create_time, '%Y-%m-%d') as date, COUNT(*) as count " +
             "FROM recipes " +
             "WHERE create_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) " +
             "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') " +
@@ -51,12 +63,34 @@ public interface StatisticsMapper {
 
     @Select("<script>" +
             "SELECT DATE_FORMAT(create_time, '%Y-%m-%d') as date, COUNT(*) as count " +
+            "FROM recipes " +
+            "WHERE create_time &gt;= #{startTime} " +
+            "AND create_time &lt; #{endTimeExclusive} " +
+            "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') " +
+            "ORDER BY date" +
+            "</script>")
+    List<Map<String, Object>> getRecipeTrendByDateRange(@Param("startTime") LocalDateTime startTime,
+                                                        @Param("endTimeExclusive") LocalDateTime endTimeExclusive);
+
+    @Select("<script>" +
+            "SELECT DATE_FORMAT(create_time, '%Y-%m-%d') as date, COUNT(*) as count " +
             "FROM comments " +
             "WHERE create_time >= DATE_SUB(CURDATE(), INTERVAL 7 DAY) " +
             "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') " +
             "ORDER BY date" +
             "</script>")
     List<Map<String, Object>> getCommentTrend();
+
+    @Select("<script>" +
+            "SELECT DATE_FORMAT(create_time, '%Y-%m-%d') as date, COUNT(*) as count " +
+            "FROM comments " +
+            "WHERE create_time &gt;= #{startTime} " +
+            "AND create_time &lt; #{endTimeExclusive} " +
+            "GROUP BY DATE_FORMAT(create_time, '%Y-%m-%d') " +
+            "ORDER BY date" +
+            "</script>")
+    List<Map<String, Object>> getCommentTrendByDateRange(@Param("startTime") LocalDateTime startTime,
+                                                         @Param("endTimeExclusive") LocalDateTime endTimeExclusive);
 
         @Select("SELECT " +
             "c.id AS category_id, " +
@@ -83,10 +117,19 @@ public interface StatisticsMapper {
             "ORDER BY d.id")
     List<Map<String, Object>> getDifficultyDistribution();
 
-        @Select("<script>" +
-            "SELECT r.id, r.title, r.like_count, r.rating_count as view_count, r.reply_count as comment_count " +
+    @Select("<script>" +
+            "SELECT r.id, r.title, r.like_count, " +
+            "COALESCE(v.view_count, 0) as view_count, " +
+            "r.reply_count as comment_count " +
             "FROM recipes r " +
-            "ORDER BY r.like_count DESC " +
+            "LEFT JOIN (" +
+            "  SELECT be.recipe_id, COUNT(*) AS view_count " +
+            "  FROM behavior_events be FORCE INDEX (idx_behavior_event_time) " +
+            "  WHERE be.event_type = 'recipe_view' " +
+            "  GROUP BY be.recipe_id " +
+            ") v ON v.recipe_id = r.id " +
+            "WHERE r.status = 1 " +
+            "ORDER BY COALESCE(v.view_count, 0) DESC, r.like_count DESC, r.id DESC " +
             "LIMIT #{limit}" +
             "</script>")
     List<Map<String, Object>> getTopRecipes(@Param("limit") int limit);

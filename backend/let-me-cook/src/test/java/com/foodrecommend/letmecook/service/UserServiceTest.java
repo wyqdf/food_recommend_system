@@ -1,7 +1,10 @@
 package com.foodrecommend.letmecook.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.foodrecommend.letmecook.common.exception.BadRequestException;
 import com.foodrecommend.letmecook.dto.*;
 import com.foodrecommend.letmecook.entity.User;
+import com.foodrecommend.letmecook.mapper.UserPreferenceProfileMapper;
 import com.foodrecommend.letmecook.mapper.UserMapper;
 import com.foodrecommend.letmecook.service.impl.UserServiceImpl;
 import com.foodrecommend.letmecook.util.JwtUtil;
@@ -23,6 +26,12 @@ class UserServiceTest {
 
     @Mock
     private JwtUtil jwtUtil;
+
+    @Mock
+    private UserPreferenceProfileMapper userPreferenceProfileMapper;
+
+    @Mock
+    private ObjectMapper objectMapper;
 
     @InjectMocks
     private UserServiceImpl userService;
@@ -65,7 +74,7 @@ class UserServiceTest {
         request.setUsername("notexist");
         request.setPassword("test123");
 
-        assertThrows(RuntimeException.class, () -> userService.login(request));
+        assertThrows(BadRequestException.class, () -> userService.login(request));
     }
 
     @Test
@@ -82,7 +91,7 @@ class UserServiceTest {
         request.setUsername("testuser");
         request.setPassword("wrongpassword");
 
-        assertThrows(RuntimeException.class, () -> userService.login(request));
+        assertThrows(BadRequestException.class, () -> userService.login(request));
     }
 
     @Test
@@ -121,7 +130,7 @@ class UserServiceTest {
         request.setUsername("existinguser");
         request.setPassword("test123");
 
-        assertThrows(RuntimeException.class, () -> userService.register(request));
+        assertThrows(BadRequestException.class, () -> userService.register(request));
     }
 
     @Test
@@ -135,6 +144,7 @@ class UserServiceTest {
         when(userMapper.findById(1)).thenReturn(user);
         when(userMapper.countFavoritesByUserId(1)).thenReturn(5);
         when(userMapper.countCommentsByUserId(1)).thenReturn(3);
+        when(userPreferenceProfileMapper.findByUserId(1)).thenReturn(null);
 
         UserProfileDTO profile = userService.getProfile(1);
 

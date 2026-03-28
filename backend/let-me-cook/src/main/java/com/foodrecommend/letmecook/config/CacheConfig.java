@@ -23,7 +23,8 @@ public class CacheConfig {
                 buildCache("recommendations", Duration.ofMinutes(5), 256),
                 buildCache("recipe_detail", Duration.ofMinutes(10), 1024),
                 buildCache("similar_recipes", Duration.ofMinutes(10), 512),
-                buildCache("search_suggestions", Duration.ofMinutes(3), 256)
+                buildCache("search_suggestions", Duration.ofMinutes(3), 256),
+                buildCache("search_results", Duration.ofMinutes(2), 512)
         ));
         return manager;
     }

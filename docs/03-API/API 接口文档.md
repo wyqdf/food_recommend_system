@@ -1,7 +1,7 @@
 # 美食推荐系统 - API 接口文档
 
 > **版本**: v2.4  
-> **最后更新**: 2026-03-20 23:59:00  
+> **最后更新**: 2026-03-28 18:30:00  
 > **基准 URL**: `http://localhost:8081/api`  
 > **数据格式**: JSON  
 > **字符编码**: UTF-8
@@ -20,19 +20,29 @@
   - 新增 `GET /recipes/search/suggestions`
 - Elasticsearch 建议词已改为独立 completion 字段，不再复用主搜索字段
 - 当前本地运行态已完成 `recipes_search_v2` 全量重建并切到 `elasticsearch`；仓库默认配置现为 `elasticsearch`
+- Windows 推荐启动脚本 `run-latest-dev.ps1` 会显式覆盖为 `SEARCH_ENGINE=auto`
 - 以下列表型接口返回项已统一补充作者字段：
   - `GET /recipes`
   - `GET /recipes/search`
   - `GET /recipes/recommend`
   - `GET /recipes/{id}/similar`
-- 推荐接口当前支持“基于现有分类的个性化筛选”：
-  - `GET /recipes/recommend` 新增可选 `categoryId`
-  - 推荐页前端分类筛选已改成调用 `GET /categories/recommend?limit=10` 动态读取前 10 热门分类
-  - `type=personal` 命中离线 `Top100` 时，不再完全覆盖实时推荐；当前口径是“离线模型结果 + 严格分类实时推荐”混合返回
-  - 离线 `Top100` 不再要求 `biz_date=当天`；当前会优先命中该用户最近一批可用离线结果
-  - 当用户选择分类时，混合结果中实时推荐部分会严格按 `categoryId` 过滤
-  - 混合结果返回前会打乱顺序
-  - 推荐页前端不再缓存 `personal` 结果，分类切换时实时推荐部分允许变化
+- 推荐接口与前端场景模式同步后，当前额外支持：
+  - `GET /recipes` / `GET /recipes/recommend` 可传 `mode`
+  - `mode` 当前合法值：`family`、`fitness`、`quick`、`party`
+  - 后端会统一映射为 `scene`：
+    - `family -> family`
+    - `fitness -> diet`
+    - `quick -> quick`
+    - `party -> banquet`
+- 推荐接口当前真实口径：
+  - `GET /recipes/recommend` 仍支持可选 `categoryId`
+  - 推荐分类入口来自 `GET /categories/recommend?limit=10`
+  - `type=personal` 在“登录用户 + 命中场景 + 存在离线 Top100”时，改成“先分开筛选，再交错返回”
+  - 目标配额按 `ceil(limit * 0.7)` 优先保证至少 `70%` 来自命中当前场景的离线 `Top100`
+  - 若命中当前场景的 `Top100` 不足，不补非场景 `Top100`，而是改由命中当前场景的实时结果补齐
+  - 实时补位来自更大的热门源与非热门源候选池，并带随机性，避免剩余 `30%` 全是大热门
+  - `Top100` 卡片优先保留离线模型理由，仅在离线理由为空时补场景文案
+  - 首页“热门菜谱”的随机性来自前端对更大热门候选池的抽样，不改变 `GET /recipes/recommend?type=hot` 的基础排序语义
 - 上述返回项新增字段：
   - `author`：作者名称
   - `authorUid`：作者用户 ID
@@ -323,13 +333,16 @@ Authorization: Bearer <token>
 |------|------|------|--------|------|
 | page | int | 否 | 1 | 页码 |
 | pageSize | int | 否 | 10 | 每页数量 |
-| categoryId | int | 否 | - | 分类 ID |
-| tasteId | int | 否 | - | 口味 ID |
-| techniqueId | int | 否 | - | 工艺 ID |
-| timeCostId | int | 否 | - | 耗时 ID |
-| difficultyId | int | 否 | - | 难度 ID |
-| sort | string | 否 | new | 排序：new-最新/hot-最热/like-最多点赞 |
-| keyword | string | 否 | - | 搜索关键词 |
+| category | int | 否 | - | 分类 ID |
+| difficulty | string | 否 | - | 难度名称，如 `简单` / `普通` / `高级` |
+| time | string | 否 | - | 耗时名称，如 `十分钟` / `半小时` |
+| sort | string | 否 | new | 排序：`new`-最新、`hot`-最多点赞、`collect`-最多收藏 |
+| mode | string | 否 | - | 场景模式：`family` / `fitness` / `quick` / `party` |
+
+**说明**:
+
+- 当传入 `mode` 时，列表接口会先取候选集，再按场景模式做一次重排，因此同一筛选条件下不同模式的返回顺序会变化。
+- `GET /recipes` 当前不支持 `keyword`，搜索请使用 `GET /recipes/search`。
 
 **响应示例**:
 
@@ -714,8 +727,9 @@ LIMIT 0, 10;
 |------|------|------|--------|------|
 | limit | int | 否 | 16 | 返回数量 |
 | type | string | 否 | personal | 推荐类型：personal-个性化/hot-热门/new-最新 |
-| categoryId | int | 否 | - | 分类 ID，用于在推荐页按现有分类筛选 |
-| scene | string | 否 | - | 兼容旧版场景筛选参数，当前推荐页默认不再使用 |
+| mode | string | 否 | - | 场景模式：`family` / `fitness` / `quick` / `party` |
+| scene | string | 否 | - | 兼容旧版场景参数；若同时传 `mode` 与 `scene`，优先使用 `scene` |
+| categoryId | int | 否 | - | 分类 ID，用于在推荐链路中限定候选范围；当前前端热门页签会传入 |
 
 **请求头** (可选):
 
@@ -761,12 +775,22 @@ Authorization: Bearer <token>
 - `idx_recipes_status_like_count` (热门推荐)
 - `idx_recipe_categories_composite` / `uk_recipe_category` (分类筛选)
 
-**推荐算法**:
+**推荐语义**:
 
-1. **热门推荐**: 按 `like_count` 降序排列
-2. **最新推荐**: 按 `create_time` 降序排列
-3. **个性化推荐** (登录用户): 根据用户浏览历史、收藏、行为埋点与偏好重排
-4. **分类筛选推荐**: 当传入 `categoryId` 时，会先扩大候选池，再按分类过滤并补齐结果，避免出现有效分类却空列表
+1. **热门推荐**：`type=hot` 时按热门候选排序返回。
+2. **最新推荐**：`type=new` 时按发布时间倒序返回。
+3. **实时个性化推荐**：匿名用户、无场景用户、或没有离线 `Top100` 的登录用户，仍走实时推荐链路。
+4. **离线 + 实时双路个性化**：当请求满足“登录用户 + 命中场景 + 存在离线 `Top100`”时：
+   - 离线 `Top100` 与实时推荐分开筛选
+   - 离线目标配额为 `ceil(limit * 0.7)`
+   - 只从命中当前场景的离线 `Top100` 中取数
+   - 若离线不足，不补非场景 `Top100`，而是由命中当前场景的实时结果补齐
+   - 实时补位来自热门源和非热门源的更大候选池，并带随机性
+   - 两路完成筛选后再交错合并，不做混池统一 rerank
+5. **理由展示**：
+   - 离线 `Top100` 卡片优先保留离线模型理由
+   - 仅当离线理由为空时，才补场景说明
+   - 实时链路仍返回场景/分类相关理由
 
 ---
 
@@ -820,11 +844,50 @@ Authorization: Bearer <token>
 **SQL 示例**:
 
 ```sql
-SELECT c.id, c.name, c.create_time, COUNT(rc.recipe_id) as recipe_count
+SELECT c.id, c.name, c.create_time, COALESCE(c.recipe_count, 0) AS recipe_count
 FROM categories c
-LEFT JOIN recipe_categories rc ON c.id = rc.category_id
-GROUP BY c.id, c.name, c.create_time
-ORDER BY c.name;
+ORDER BY c.id;
+```
+
+### 2. 获取推荐分类
+
+**接口地址**: `GET /categories/recommend`
+
+**功能描述**: 获取推荐页/首页使用的推荐分类入口
+
+**请求参数**:
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|------|------|------|--------|------|
+| limit | int | 否 | 10 | 返回数量，当前后端上限为 10 |
+
+**说明**:
+
+- 该接口不是简单的“按 `recipe_count` 取前 N 个分类”。
+- 当前实现会先按 `categories.recipe_count` 做基础排序，再做一层多样化挑选，避免 `热菜 / 午餐 / 晚餐` 这类高重叠泛分类挤满入口。
+- 首页当前通常取 `limit=8`，推荐页通常取 `limit=10`。
+
+**响应示例**:
+
+```json
+{
+  "code": 200,
+  "message": "success",
+  "data": [
+    {
+      "id": 1,
+      "name": "家常菜",
+      "recipeCount": 1234,
+      "createTime": "2026-01-01T00:00:00"
+    },
+    {
+      "id": 42,
+      "name": "宴客菜",
+      "recipeCount": 876,
+      "createTime": "2026-01-01T00:00:00"
+    }
+  ]
+}
 ```
 
 ---

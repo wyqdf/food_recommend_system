@@ -12,7 +12,7 @@ services:
       xpack.security.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
     ports:
-      - "9200:9200"
+      - "${ELASTICSEARCH_PORT:-9200}:9200"
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
 
@@ -23,10 +23,12 @@ services:
     container_name: food-backend
     restart: unless-stopped
     ports:
-      - "8081:8081"
+      - "${BACKEND_PORT:-8081}:8081"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       TZ: Asia/Shanghai
-      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST:-host.docker.internal}:${DB_PORT:-3306}/${DB_NAME:-food_recommend}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://${DB_HOST:-host.docker.internal}:${DB_PORT:-3306}/${DB_NAME:-food_recommend}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&rewriteBatchedStatements=true&cacheResultSetMetadata=true&cacheServerConfiguration=true&elideSetAutoCommits=true&maintainTimeStats=false
       SPRING_DATASOURCE_USERNAME: ${DB_USER:-root}
       DB_PASSWORD: ${DB_PASSWORD:-123456}
       JWT_SECRET: ${JWT_SECRET:-letMeCookSecretKey2024FoodRecommendationSystem}
@@ -36,10 +38,10 @@ services:
       SEARCH_ES_INDEX_NAME: ${SEARCH_ES_INDEX_NAME:-recipes_search_v2}
       SEARCH_ES_BATCH_SIZE: ${SEARCH_ES_BATCH_SIZE:-500}
       SEARCH_ES_AUTO_CREATE_INDEX: ${SEARCH_ES_AUTO_CREATE_INDEX:-true}
-      ALIYUN_OSS_ENABLED: "true"
+      ALIYUN_OSS_ENABLED: ${ALIYUN_OSS_ENABLED:-false}
       ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-beijing.aliyuncs.com}
-      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID:-REPLACE_WITH_REAL_ACCESS_KEY_ID}
-      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET:-REPLACE_WITH_REAL_ACCESS_KEY_SECRET}
+      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID:-}
+      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET:-}
       ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-recipe-images}
     depends_on:
       - elasticsearch
@@ -51,7 +53,11 @@ services:
     container_name: food-frontend
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "${FRONTEND_PORT:-3000}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      NGINX_API_UPSTREAM: ${NGINX_API_UPSTREAM:-http://backend:8081}
     depends_on:
       - backend
 

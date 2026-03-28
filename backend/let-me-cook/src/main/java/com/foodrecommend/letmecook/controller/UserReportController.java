@@ -19,13 +19,10 @@ public class UserReportController {
     private final UserReportService userReportService;
 
     @GetMapping("/7d")
-    public Result<UserReport7dDTO> get7dReport(@RequestHeader("Authorization") String authorization) {
-        try {
-            Integer userId = authTokenHelper.requireUserId(authorization);
-            UserReport7dDTO report = userReportService.build7dReport(userId);
-            return Result.success(report);
-        } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
-        }
+    public Result<UserReport7dDTO> get7dReport(
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        Integer userId = authTokenHelper.requireUserId(authorization);
+        UserReport7dDTO report = userReportService.build7dReport(userId);
+        return Result.success(report);
     }
 }

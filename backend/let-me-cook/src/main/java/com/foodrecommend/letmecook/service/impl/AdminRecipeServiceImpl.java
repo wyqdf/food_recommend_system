@@ -35,6 +35,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
     private final TimeCostMapper timeCostMapper;
     private final DifficultyMapper difficultyMapper;
     private final IngredientMapper ingredientMapper;
+    private final BehaviorEventMapper behaviorEventMapper;
     private final ApplicationEventPublisher applicationEventPublisher;
 
     @Override
@@ -65,12 +66,13 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
                 recipeMap.put(recipe.getId(), recipe);
             }
         }
+        Map<Integer, Integer> viewCountMap = buildRecipeViewCountMap(recipeIds);
 
         List<RecipeDTO> list = new ArrayList<>(recipeIds.size());
         for (Integer recipeId : recipeIds) {
             Recipe recipe = recipeMap.get(recipeId);
             if (recipe != null) {
-                list.add(convertToDTO(recipe));
+                list.add(convertToDTO(recipe, viewCountMap.getOrDefault(recipeId, 0)));
             }
         }
 
@@ -83,7 +85,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         if (recipe == null) {
             throw new RuntimeException("食谱不存在");
         }
-        return convertToDetailDTO(recipe);
+        return convertToDetailDTO(recipe, behaviorEventMapper.countRecipeViewsByRecipeId(id));
     }
 
     @Override
@@ -142,7 +144,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
 
         publishSearchUpsert(recipe.getId());
         
-        return convertToDTO(recipe);
+        return convertToDTO(recipe, 0);
     }
 
     @Override
@@ -254,7 +256,20 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         publishSearchUpsert(id);
     }
 
-    private RecipeDTO convertToDTO(Recipe recipe) {
+    private Map<Integer, Integer> buildRecipeViewCountMap(List<Integer> recipeIds) {
+        Map<Integer, Integer> viewCountMap = new LinkedHashMap<>();
+        if (recipeIds == null || recipeIds.isEmpty()) {
+            return viewCountMap;
+        }
+        for (BehaviorEventMapper.RecipeViewCountDTO row : behaviorEventMapper.countRecipeViewsByRecipeIds(recipeIds)) {
+            if (row.getRecipeId() != null) {
+                viewCountMap.put(row.getRecipeId(), row.getTotal() == null ? 0 : row.getTotal());
+            }
+        }
+        return viewCountMap;
+    }
+
+    private RecipeDTO convertToDTO(Recipe recipe, int viewCount) {
         RecipeDTO dto = new RecipeDTO();
         dto.setId(recipe.getId());
         dto.setTitle(recipe.getTitle());
@@ -267,7 +282,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         dto.setTimeCostId(recipe.getTimeCostId());
         dto.setReplyCount(recipe.getReplyCount());
         dto.setLikeCount(recipe.getLikeCount());
-        dto.setViewCount(recipe.getRatingCount());
+        dto.setViewCount(viewCount);
 
         dto.setDifficulty(resolveName(recipe.getDifficultyName(), recipe.getDifficultyId(),
                 idVal -> {
@@ -297,7 +312,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         return dto;
     }
 
-    private RecipeDetailDTO convertToDetailDTO(Recipe recipe) {
+    private RecipeDetailDTO convertToDetailDTO(Recipe recipe, int viewCount) {
         RecipeDetailDTO dto = new RecipeDetailDTO();
         dto.setId(recipe.getId());
         dto.setTitle(recipe.getTitle());
@@ -309,7 +324,7 @@ public class AdminRecipeServiceImpl implements AdminRecipeService {
         dto.setCookware(recipe.getCookware());
         dto.setReplyCount(recipe.getReplyCount());
         dto.setLikeCount(recipe.getLikeCount());
-        dto.setViewCount(recipe.getRatingCount());
+        dto.setViewCount(viewCount);
         
         dto.setTaste(buildAttributeInfo(recipe.getTasteId(), idVal -> {
             Taste taste = tasteMapper.findById(idVal);

@@ -44,7 +44,7 @@ public class RecipeListDTOAssembler {
             dto.setTime(recipe.getTimeCostName());
             dto.setTaste(recipe.getTasteName());
             dto.setLikeCount(recipe.getLikeCount());
-            dto.setFavoriteCount(recipe.getRatingCount());
+            dto.setFavoriteCount(recipe.getFavoriteCount());
             dto.setReplyCount(recipe.getReplyCount());
             dto.setCategories(categoryMap.getOrDefault(recipe.getId(), List.of()));
             dto.setIngredients(ingredientMap.getOrDefault(recipe.getId(), List.of()));

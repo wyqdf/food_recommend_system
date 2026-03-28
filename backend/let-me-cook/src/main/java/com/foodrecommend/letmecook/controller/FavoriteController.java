@@ -24,54 +24,38 @@ public class FavoriteController {
     public Result<PageResult<RecipeListDTO>> getFavorites(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "10") int pageSize,
-            @RequestHeader("Authorization") String authorization) {
-        try {
-            Integer userId = authTokenHelper.requireUserId(authorization);
-            PageResult<RecipeListDTO> result = favoriteService.getFavorites(userId, page, pageSize);
-            return Result.success(result);
-        } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
-        }
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        Integer userId = authTokenHelper.requireUserId(authorization);
+        PageResult<RecipeListDTO> result = favoriteService.getFavorites(userId, page, pageSize);
+        return Result.success(result);
     }
     
     @PostMapping
     public Result<Object> addFavorite(
             @RequestBody FavoriteRequest request,
-            @RequestHeader("Authorization") String authorization) {
-        try {
-            Integer userId = authTokenHelper.requireUserId(authorization);
-            favoriteService.addFavorite(userId, request.getRecipeId());
-            return Result.success(null, "收藏成功");
-        } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
-        }
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        Integer userId = authTokenHelper.requireUserId(authorization);
+        favoriteService.addFavorite(userId, request.getRecipeId());
+        return Result.success(null, "收藏成功");
     }
     
     @DeleteMapping("/{recipeId}")
     public Result<Object> removeFavorite(
             @PathVariable Integer recipeId,
-            @RequestHeader("Authorization") String authorization) {
-        try {
-            Integer userId = authTokenHelper.requireUserId(authorization);
-            favoriteService.removeFavorite(userId, recipeId);
-            return Result.success(null, "取消收藏成功");
-        } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
-        }
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        Integer userId = authTokenHelper.requireUserId(authorization);
+        favoriteService.removeFavorite(userId, recipeId);
+        return Result.success(null, "取消收藏成功");
     }
     
     @GetMapping("/check/{recipeId}")
     public Result<Map<String, Boolean>> checkFavorite(
             @PathVariable Integer recipeId,
-            @RequestHeader("Authorization") String authorization) {
-        try {
-            Integer userId = authTokenHelper.requireUserId(authorization);
-            boolean isFavorite = favoriteService.checkFavorite(userId, recipeId);
-            Map<String, Boolean> data = new HashMap<>();
-            data.put("isFavorite", isFavorite);
-            return Result.success(data);
-        } catch (Exception e) {
-            return Result.error(401, "登录已过期，请重新登录");
-        }
+            @RequestHeader(value = "Authorization", required = false) String authorization) {
+        Integer userId = authTokenHelper.requireUserId(authorization);
+        boolean isFavorite = favoriteService.checkFavorite(userId, recipeId);
+        Map<String, Boolean> data = new HashMap<>();
+        data.put("isFavorite", isFavorite);
+        return Result.success(data);
     }
 }

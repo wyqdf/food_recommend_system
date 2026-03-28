@@ -31,7 +31,8 @@ public interface RecipeService {
 
         RecommendResponse getRecommendationsByType(String type, int limit, Integer userId, String sceneCode);
 
-        RecommendResponse getRecommendationsByType(String type, int limit, Integer userId, String sceneCode, Integer categoryId);
+        RecommendResponse getRecommendationsByType(String type, int limit, Integer userId, String sceneCode,
+                        Integer categoryId);
 
         List<RecipeListDTO> getSimilarRecipes(Integer recipeId, int limit);
 

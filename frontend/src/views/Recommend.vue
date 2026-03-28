@@ -58,6 +58,7 @@ import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
 import { Star, TrendCharts, Clock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import { createLatestRequestGuard } from '@/utils/latestRequest'
 import { trackBehavior } from '@/utils/tracker'
 import { useSceneModeStore } from '@/stores/sceneMode'
 
@@ -69,6 +70,7 @@ const loading = ref(false)
 const cache = new Map()
 const selectedCategoryId = ref('')
 const categoryOptions = ref([])
+const latestFetchGuard = createLatestRequestGuard()
 
 const gridKey = computed(() => `${currentMode.value}_${activeTab.value}_${selectedCategoryId.value || 'all'}`)
 
@@ -90,10 +92,12 @@ const loadCategories = async () => {
 }
 
 const fetchRecommend = async () => {
+  const requestId = latestFetchGuard.begin()
   const categoryKey = activeTab.value === 'hot' ? selectedCategoryId.value || 'all' : 'all'
   const cacheKey = `${activeTab.value}_${categoryKey}_${currentMode.value}_12`
   if (cache.has(cacheKey)) {
     recipeList.value = cache.get(cacheKey)
+    loading.value = false
     return
   }
 
@@ -104,8 +108,12 @@ const fetchRecommend = async () => {
       params.categoryId = selectedCategoryId.value
     }
     const res = await recipeApi.getRecommend(params)
-    recipeList.value = res.data.list || []
-    cache.set(cacheKey, recipeList.value)
+    if (!latestFetchGuard.isLatest(requestId)) {
+      return
+    }
+    const nextList = res.data.list || []
+    recipeList.value = nextList
+    cache.set(cacheKey, nextList)
     const selectedCategoryName = activeTab.value === 'hot'
       ? categoryOptions.value.find(item => String(item.id) === String(selectedCategoryId.value))?.name || null
       : null
@@ -121,10 +129,15 @@ const fetchRecommend = async () => {
       }
     })
   } catch (error) {
+    if (!latestFetchGuard.isLatest(requestId)) {
+      return
+    }
     recipeList.value = []
     ElMessage.warning('推荐加载稍慢，请稍后重试')
   } finally {
-    loading.value = false
+    if (latestFetchGuard.isLatest(requestId)) {
+      loading.value = false
+    }
   }
 }
 

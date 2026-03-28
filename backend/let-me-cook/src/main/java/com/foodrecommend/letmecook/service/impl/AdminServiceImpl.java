@@ -1,6 +1,8 @@
 package com.foodrecommend.letmecook.service.impl;
 
 import com.foodrecommend.letmecook.common.PageResult;
+import com.foodrecommend.letmecook.common.exception.BadRequestException;
+import com.foodrecommend.letmecook.common.exception.NotFoundException;
 import com.foodrecommend.letmecook.dto.admin.*;
 import com.foodrecommend.letmecook.entity.*;
 import com.foodrecommend.letmecook.mapper.AdminMapper;
@@ -17,10 +19,16 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -42,15 +50,15 @@ public class AdminServiceImpl implements AdminService {
     public AdminLoginResponse login(AdminLoginRequest request, String ip) {
         Admin admin = adminMapper.findByUsername(request.getUsername());
         if (admin == null) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BadRequestException("用户名或密码错误");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), admin.getPassword())) {
-            throw new RuntimeException("用户名或密码错误");
+            throw new BadRequestException("用户名或密码错误");
         }
 
         if (admin.getStatus() != null && admin.getStatus() == 0) {
-            throw new RuntimeException("账号已被禁用");
+            throw new BadRequestException("账号已被禁用");
         }
 
         adminMapper.updateLoginInfo(admin.getId(), new Date(), ip);
@@ -73,10 +81,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminProfileDTO getProfile(Integer adminId) {
-        Admin admin = adminMapper.findById(adminId);
-        if (admin == null) {
-            throw new RuntimeException("管理员不存在");
-        }
+        Admin admin = requireAdmin(adminId);
 
         AdminProfileDTO dto = new AdminProfileDTO();
         dto.setId(admin.getId());
@@ -90,18 +95,13 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void updatePassword(Integer adminId, ChangePasswordRequest request) {
-        Admin admin = adminMapper.findById(adminId);
-        if (admin == null) {
-            throw new RuntimeException("管理员不存在");
-        }
+        Admin admin = requireAdmin(adminId);
 
         if (!passwordEncoder.matches(request.getOldPassword(), admin.getPassword())) {
-            throw new RuntimeException("旧密码错误");
+            throw new BadRequestException("旧密码错误");
         }
 
-        if (request.getNewPassword() == null || request.getNewPassword().length() < 6) {
-            throw new RuntimeException("新密码长度至少6位");
-        }
+        ensurePasswordLength(request.getNewPassword(), "新密码长度至少6位");
 
         String encodedPassword = passwordEncoder.encode(request.getNewPassword());
         adminMapper.updatePassword(adminId, encodedPassword);
@@ -148,29 +148,25 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public UserDTO getUserById(Integer id) {
-        UserDTO user = adminUserMapper.findUserById(id);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
-        return user;
+        return requireManagedUser(id);
     }
 
     @Override
     @Transactional
     public UserDTO createUser(CreateUserRequest request) {
         if (request.getUsername() == null || request.getUsername().trim().isEmpty()) {
-            throw new RuntimeException("用户名不能为空");
+            throw new BadRequestException("用户名不能为空");
         }
 
         User existUser = adminUserMapper.findByUsername(request.getUsername());
         if (existUser != null) {
-            throw new RuntimeException("用户名已存在");
+            throw new BadRequestException("用户名已存在");
         }
 
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             User existEmail = adminUserMapper.findByEmail(request.getEmail());
             if (existEmail != null) {
-                throw new RuntimeException("邮箱已存在");
+                throw new BadRequestException("邮箱已存在");
             }
         }
 
@@ -182,9 +178,7 @@ public class AdminServiceImpl implements AdminService {
         user.setStatus(request.getStatus() != null ? request.getStatus() : 1);
 
         String password = request.getPassword();
-        if (password == null || password.length() < 6) {
-            throw new RuntimeException("密码长度至少6位");
-        }
+        ensurePasswordLength(password, "密码长度至少6位");
         user.setPassword(passwordEncoder.encode(password));
 
         adminUserMapper.insertUser(user);
@@ -195,15 +189,12 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void updateUser(Integer id, UpdateUserRequestAdmin request) {
-        UserDTO existUser = adminUserMapper.findUserById(id);
-        if (existUser == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        requireManagedUser(id);
 
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
             User existEmail = adminUserMapper.findByEmail(request.getEmail());
             if (existEmail != null && !existEmail.getId().equals(id)) {
-                throw new RuntimeException("邮箱已存在");
+                throw new BadRequestException("邮箱已存在");
             }
         }
 
@@ -220,10 +211,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void deleteUser(Integer id) {
-        UserDTO existUser = adminUserMapper.findUserById(id);
-        if (existUser == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        requireManagedUser(id);
         adminUserMapper.deleteUser(id);
     }
 
@@ -231,7 +219,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void batchDeleteUsers(Integer[] ids) {
         if (ids == null || ids.length == 0) {
-            throw new RuntimeException("请选择要删除的用户");
+            throw new BadRequestException("请选择要删除的用户");
         }
         adminUserMapper.batchDeleteUsers(ids);
     }
@@ -239,10 +227,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void updateUserStatus(Integer id, Integer status) {
-        UserDTO existUser = adminUserMapper.findUserById(id);
-        if (existUser == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        requireManagedUser(id);
         adminUserMapper.updateStatus(id, status);
 
         if (status == 0) {
@@ -253,17 +238,33 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional
     public void resetUserPassword(Integer id, String password) {
-        UserDTO existUser = adminUserMapper.findUserById(id);
-        if (existUser == null) {
-            throw new RuntimeException("用户不存在");
-        }
-
-        if (password == null || password.length() < 6) {
-            throw new RuntimeException("密码长度至少6位");
-        }
+        requireManagedUser(id);
+        ensurePasswordLength(password, "密码长度至少6位");
 
         String encodedPassword = passwordEncoder.encode(password);
         adminUserMapper.updatePassword(id, encodedPassword);
+    }
+
+    private Admin requireAdmin(Integer adminId) {
+        Admin admin = adminMapper.findById(adminId);
+        if (admin == null) {
+            throw new NotFoundException("管理员不存在");
+        }
+        return admin;
+    }
+
+    private UserDTO requireManagedUser(Integer id) {
+        UserDTO user = adminUserMapper.findUserById(id);
+        if (user == null) {
+            throw new NotFoundException("用户不存在");
+        }
+        return user;
+    }
+
+    private void ensurePasswordLength(String password, String message) {
+        if (password == null || password.length() < 6) {
+            throw new BadRequestException(message);
+        }
     }
 
     @Override
@@ -299,16 +300,27 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public StatisticsDTO getUserStatistics(String type, String startTime, String endTime) {
         StatisticsDTO dto = new StatisticsDTO();
+        StatisticsDateRange range = resolveStatisticsDateRange(type, startTime, endTime);
 
-        // 优先从汇总表读取近 7 天数据
-        List<UserTrendDaily> trendData = statisticsSummaryMapper.getLatestUserTrend();
-
+        List<UserTrendDaily> trendData = filterByDateRange(
+                statisticsSummaryMapper.getUserTrendByDateRange(range.startDate()),
+                UserTrendDaily::getStatDate,
+                range);
         if (hasData(trendData)) {
-            dto.setTrend(buildTrendItems(trendData, UserTrendDaily::getStatDate, UserTrendDaily::getNewUsersCount));
+            dto.setTrend(buildTrendItems(
+                    trendData,
+                    UserTrendDaily::getStatDate,
+                    UserTrendDaily::getNewUsersCount,
+                    range));
         } else {
-            // 如果汇总表没有数据，使用原始查询
-            List<Map<String, Object>> rawData = statisticsMapper.getUserTrend();
-            dto.setTrend(convertToTrendList(rawData));
+            List<Map<String, Object>> rawData = statisticsMapper.getUserTrendByDateRange(
+                    range.startDateTime(),
+                    range.endTimeExclusive());
+            dto.setTrend(buildTrendItems(
+                    convertToTrendPoints(rawData),
+                    TrendPoint::date,
+                    TrendPoint::count,
+                    range));
         }
 
         return dto;
@@ -317,18 +329,30 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public StatisticsDTO getRecipeStatistics(String type, String startTime, String endTime) {
         StatisticsDTO dto = new StatisticsDTO();
+        StatisticsDateRange range = resolveStatisticsDateRange(type, startTime, endTime);
 
-        // 食谱趋势
-        List<RecipeTrendDaily> trendData = statisticsSummaryMapper.getLatestRecipeTrend();
+        List<RecipeTrendDaily> trendData = filterByDateRange(
+                statisticsSummaryMapper.getRecipeTrendByDateRange(range.startDate()),
+                RecipeTrendDaily::getStatDate,
+                range);
         if (hasData(trendData)) {
-            dto.setTrend(buildTrendItems(trendData, RecipeTrendDaily::getStatDate, RecipeTrendDaily::getNewRecipesCount));
+            dto.setTrend(buildTrendItems(
+                    trendData,
+                    RecipeTrendDaily::getStatDate,
+                    RecipeTrendDaily::getNewRecipesCount,
+                    range));
         } else {
-            List<Map<String, Object>> rawData = statisticsMapper.getRecipeTrend();
-            dto.setTrend(convertToTrendList(rawData));
+            List<Map<String, Object>> rawData = statisticsMapper.getRecipeTrendByDateRange(
+                    range.startDateTime(),
+                    range.endTimeExclusive());
+            dto.setTrend(buildTrendItems(
+                    convertToTrendPoints(rawData),
+                    TrendPoint::date,
+                    TrendPoint::count,
+                    range));
         }
 
-        // 分类分布
-        List<CategoryDistributionSummary> categoryData = statisticsSummaryMapper.getLatestCategoryDistribution();
+        List<CategoryDistributionSummary> categoryData = loadCategoryDistributionSnapshot(range);
         if (hasData(categoryData)) {
             dto.setCategoryDistribution(buildDistributionItems(
                 categoryData,
@@ -340,8 +364,7 @@ public class AdminServiceImpl implements AdminService {
             dto.setCategoryDistribution(convertToDistributionList(rawData));
         }
 
-        // 难度分布
-        List<DifficultyDistributionSummary> difficultyData = statisticsSummaryMapper.getLatestDifficultyDistribution();
+        List<DifficultyDistributionSummary> difficultyData = loadDifficultyDistributionSnapshot(range);
         if (hasData(difficultyData)) {
             dto.setDifficultyDistribution(buildDistributionItems(
                 difficultyData,
@@ -353,8 +376,7 @@ public class AdminServiceImpl implements AdminService {
             dto.setDifficultyDistribution(convertToDistributionList(rawData));
         }
 
-        // 热门食谱 Top 10
-        List<TopRecipesHourly> topRecipesData = statisticsSummaryMapper.getLatestTopRecipes(10);
+        List<TopRecipesHourly> topRecipesData = loadTopRecipesSnapshot(range);
         if (hasData(topRecipesData)) {
             dto.setTopRecipes(buildTopRecipeItems(
                 topRecipesData,
@@ -374,18 +396,30 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public StatisticsDTO getCommentStatistics(String type, String startTime, String endTime) {
         StatisticsDTO dto = new StatisticsDTO();
+        StatisticsDateRange range = resolveStatisticsDateRange(type, startTime, endTime);
 
-        // 评论趋势
-        List<CommentTrendDaily> trendData = statisticsSummaryMapper.getLatestCommentTrend();
+        List<CommentTrendDaily> trendData = filterByDateRange(
+                statisticsSummaryMapper.getCommentTrendByDateRange(range.startDate()),
+                CommentTrendDaily::getStatDate,
+                range);
         if (hasData(trendData)) {
-            dto.setCommentsTrend(buildTrendItems(trendData, CommentTrendDaily::getStatDate, CommentTrendDaily::getNewCommentsCount));
+            dto.setCommentsTrend(buildTrendItems(
+                    trendData,
+                    CommentTrendDaily::getStatDate,
+                    CommentTrendDaily::getNewCommentsCount,
+                    range));
         } else {
-            List<Map<String, Object>> rawData = statisticsMapper.getCommentTrend();
-            dto.setCommentsTrend(convertToTrendList(rawData));
+            List<Map<String, Object>> rawData = statisticsMapper.getCommentTrendByDateRange(
+                    range.startDateTime(),
+                    range.endTimeExclusive());
+            dto.setCommentsTrend(buildTrendItems(
+                    convertToTrendPoints(rawData),
+                    TrendPoint::date,
+                    TrendPoint::count,
+                    range));
         }
 
-        // 热门评论食谱 Top 10
-        List<TopCommentedRecipesHourly> topCommentedData = statisticsSummaryMapper.getLatestTopCommentedRecipes(10);
+        List<TopCommentedRecipesHourly> topCommentedData = loadTopCommentedRecipesSnapshot(range);
         if (hasData(topCommentedData)) {
             dto.setTopCommentedRecipes(buildTopCommentedItems(
                 topCommentedData,
@@ -405,19 +439,134 @@ public class AdminServiceImpl implements AdminService {
         return data != null && !data.isEmpty();
     }
 
+    private StatisticsDateRange resolveStatisticsDateRange(String type, String startTime, String endTime) {
+        StatisticsGranularity granularity = StatisticsGranularity.from(type);
+        LocalDate explicitStart = parseStatisticsDate(startTime, "startTime");
+        LocalDate explicitEnd = parseStatisticsDate(endTime, "endTime");
+
+        LocalDate safeEnd = explicitEnd != null ? explicitEnd : LocalDate.now();
+        LocalDate safeStart = explicitStart != null ? explicitStart : defaultStartDate(safeEnd, granularity);
+        if (safeStart.isAfter(safeEnd)) {
+            throw new BadRequestException("startTime 不能晚于 endTime");
+        }
+
+        return new StatisticsDateRange(
+                granularity,
+                safeStart,
+                safeEnd,
+                explicitStart != null || explicitEnd != null);
+    }
+
+    private LocalDate defaultStartDate(LocalDate endDate, StatisticsGranularity granularity) {
+        return switch (granularity) {
+            case DAILY -> endDate.minusDays(6);
+            case WEEKLY -> endDate.minusWeeks(11);
+            case MONTHLY -> endDate.minusMonths(11);
+        };
+    }
+
+    private LocalDate parseStatisticsDate(String rawValue, String fieldName) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+
+        String value = rawValue.trim();
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return OffsetDateTime.parse(value).toLocalDate();
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return LocalDateTime.parse(value).toLocalDate();
+        } catch (DateTimeParseException ignored) {
+        }
+        try {
+            return LocalDateTime.parse(value.replace(' ', 'T')).toLocalDate();
+        } catch (DateTimeParseException ignored) {
+        }
+
+        throw new BadRequestException(fieldName + " 格式无效，请使用 ISO 8601 日期或日期时间");
+    }
+
+    private <T> List<T> filterByDateRange(List<T> data,
+            Function<T, LocalDate> dateExtractor,
+            StatisticsDateRange range) {
+        if (data == null || data.isEmpty()) {
+            return List.of();
+        }
+
+        List<T> filtered = new ArrayList<>(data.size());
+        for (T entry : data) {
+            LocalDate date = dateExtractor.apply(entry);
+            if (date == null
+                    || date.isBefore(range.startDate())
+                    || date.isAfter(range.endDate())) {
+                continue;
+            }
+            filtered.add(entry);
+        }
+        return filtered;
+    }
+
     private <T> List<StatisticsDTO.TrendItem> buildTrendItems(
             List<T> data,
             Function<T, LocalDate> dateExtractor,
-            Function<T, Integer> countExtractor) {
-        List<StatisticsDTO.TrendItem> result = new ArrayList<>(data.size());
-        for (T entry : data) {
+            Function<T, Integer> countExtractor,
+            StatisticsDateRange range) {
+        LinkedHashMap<LocalDate, Integer> bucketTotals = initializeTrendBuckets(range);
+        if (data != null) {
+            for (T entry : data) {
+                LocalDate date = dateExtractor.apply(entry);
+                if (date == null
+                        || date.isBefore(range.startDate())
+                        || date.isAfter(range.endDate())) {
+                    continue;
+                }
+                LocalDate bucketStart = bucketStart(date, range.granularity());
+                if (!bucketTotals.containsKey(bucketStart)) {
+                    continue;
+                }
+                bucketTotals.put(bucketStart, bucketTotals.get(bucketStart) + safeInt(countExtractor.apply(entry)));
+            }
+        }
+
+        List<StatisticsDTO.TrendItem> result = new ArrayList<>(bucketTotals.size());
+        for (Map.Entry<LocalDate, Integer> entry : bucketTotals.entrySet()) {
             StatisticsDTO.TrendItem item = new StatisticsDTO.TrendItem();
-            LocalDate date = dateExtractor.apply(entry);
-            item.setDate(date != null ? date.toString() : null);
-            item.setCount(safeInt(countExtractor.apply(entry)));
+            item.setDate(entry.getKey().toString());
+            item.setCount(entry.getValue());
             result.add(item);
         }
         return result;
+    }
+
+    private LinkedHashMap<LocalDate, Integer> initializeTrendBuckets(StatisticsDateRange range) {
+        LinkedHashMap<LocalDate, Integer> buckets = new LinkedHashMap<>();
+        LocalDate cursor = bucketStart(range.startDate(), range.granularity());
+        while (!cursor.isAfter(range.endDate())) {
+            buckets.put(cursor, 0);
+            cursor = nextBucket(cursor, range.granularity());
+        }
+        return buckets;
+    }
+
+    private LocalDate bucketStart(LocalDate date, StatisticsGranularity granularity) {
+        return switch (granularity) {
+            case DAILY -> date;
+            case WEEKLY -> date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
+            case MONTHLY -> date.withDayOfMonth(1);
+        };
+    }
+
+    private LocalDate nextBucket(LocalDate current, StatisticsGranularity granularity) {
+        return switch (granularity) {
+            case DAILY -> current.plusDays(1);
+            case WEEKLY -> current.plusWeeks(1);
+            case MONTHLY -> current.plusMonths(1);
+        };
     }
 
     private <T> List<StatisticsDTO.DistributionItem> buildDistributionItems(
@@ -472,6 +621,50 @@ public class AdminServiceImpl implements AdminService {
         return value != null ? value : 0;
     }
 
+    private List<CategoryDistributionSummary> loadCategoryDistributionSnapshot(StatisticsDateRange range) {
+        if (range.hasExplicitTimeRange()) {
+            List<CategoryDistributionSummary> snapshot = statisticsSummaryMapper.getCategoryDistributionByDate(range.endDate());
+            if (hasData(snapshot)) {
+                return snapshot;
+            }
+        }
+        return statisticsSummaryMapper.getLatestCategoryDistribution();
+    }
+
+    private List<DifficultyDistributionSummary> loadDifficultyDistributionSnapshot(StatisticsDateRange range) {
+        if (range.hasExplicitTimeRange()) {
+            List<DifficultyDistributionSummary> snapshot = statisticsSummaryMapper.getDifficultyDistributionByDate(range.endDate());
+            if (hasData(snapshot)) {
+                return snapshot;
+            }
+        }
+        return statisticsSummaryMapper.getLatestDifficultyDistribution();
+    }
+
+    private List<TopRecipesHourly> loadTopRecipesSnapshot(StatisticsDateRange range) {
+        if (range.hasExplicitTimeRange()) {
+            List<TopRecipesHourly> snapshot = statisticsSummaryMapper.getTopRecipesBefore(
+                    range.endTimeExclusive().minusNanos(1),
+                    10);
+            if (hasData(snapshot)) {
+                return snapshot;
+            }
+        }
+        return statisticsSummaryMapper.getLatestTopRecipes(10);
+    }
+
+    private List<TopCommentedRecipesHourly> loadTopCommentedRecipesSnapshot(StatisticsDateRange range) {
+        if (range.hasExplicitTimeRange()) {
+            List<TopCommentedRecipesHourly> snapshot = statisticsSummaryMapper.getTopCommentedRecipesBefore(
+                    range.endTimeExclusive().minusNanos(1),
+                    10);
+            if (hasData(snapshot)) {
+                return snapshot;
+            }
+        }
+        return statisticsSummaryMapper.getLatestTopCommentedRecipes(10);
+    }
+
     private Map<Integer, Integer> toCountMap(List<Map<String, Object>> rows) {
         Map<Integer, Integer> countMap = new HashMap<>();
         if (rows == null || rows.isEmpty()) {
@@ -487,19 +680,41 @@ public class AdminServiceImpl implements AdminService {
         return countMap;
     }
 
-    private List<StatisticsDTO.TrendItem> convertToTrendList(List<Map<String, Object>> data) {
-        List<StatisticsDTO.TrendItem> result = new ArrayList<>();
+    private List<TrendPoint> convertToTrendPoints(List<Map<String, Object>> data) {
         if (data == null || data.isEmpty()) {
-            return result;
+            return List.of();
         }
+
+        List<TrendPoint> points = new ArrayList<>(data.size());
         for (Map<String, Object> item : data) {
-            StatisticsDTO.TrendItem trendItem = new StatisticsDTO.TrendItem();
             LocalDate date = MapValueUtils.getLocalDate(item, "date");
-            trendItem.setDate(date != null ? date.toString() : MapValueUtils.getString(item, "date"));
-            trendItem.setCount(MapValueUtils.getIntOrDefault(item, 0, "count"));
-            result.add(trendItem);
+            if (date == null) {
+                date = parseRawTrendDate(MapValueUtils.getString(item, "date"));
+            }
+            if (date == null) {
+                continue;
+            }
+            points.add(new TrendPoint(date, MapValueUtils.getIntOrDefault(item, 0, "count")));
         }
-        return result;
+        return points;
+    }
+
+    private LocalDate parseRawTrendDate(String rawValue) {
+        if (rawValue == null || rawValue.isBlank()) {
+            return null;
+        }
+        String value = rawValue.trim();
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException ignored) {
+        }
+        if (value.length() >= 10) {
+            try {
+                return LocalDate.parse(value.substring(0, 10));
+            } catch (DateTimeParseException ignored) {
+            }
+        }
+        return null;
     }
 
     private List<StatisticsDTO.DistributionItem> convertToDistributionList(List<Map<String, Object>> data) {
@@ -525,7 +740,7 @@ public class AdminServiceImpl implements AdminService {
             StatisticsDTO.TopRecipeItem topItem = new StatisticsDTO.TopRecipeItem();
             topItem.setId(MapValueUtils.getIntOrDefault(item, 0, "id", "recipe_id"));
             topItem.setTitle(MapValueUtils.getString(item, "title", "recipe_title"));
-            topItem.setViewCount(MapValueUtils.getIntOrDefault(item, 0, "view_count", "rating_count"));
+            topItem.setViewCount(MapValueUtils.getIntOrDefault(item, 0, "view_count"));
             topItem.setLikeCount(MapValueUtils.getIntOrDefault(item, 0, "like_count"));
             result.add(topItem);
         }
@@ -545,5 +760,39 @@ public class AdminServiceImpl implements AdminService {
             result.add(topItem);
         }
         return result;
+    }
+
+    private enum StatisticsGranularity {
+        DAILY,
+        WEEKLY,
+        MONTHLY;
+
+        private static StatisticsGranularity from(String rawType) {
+            if (rawType == null || rawType.isBlank()) {
+                return DAILY;
+            }
+            return switch (rawType.trim().toLowerCase()) {
+                case "weekly", "week" -> WEEKLY;
+                case "monthly", "month" -> MONTHLY;
+                default -> DAILY;
+            };
+        }
+    }
+
+    private record StatisticsDateRange(
+            StatisticsGranularity granularity,
+            LocalDate startDate,
+            LocalDate endDate,
+            boolean hasExplicitTimeRange) {
+        private LocalDateTime startDateTime() {
+            return startDate.atStartOfDay();
+        }
+
+        private LocalDateTime endTimeExclusive() {
+            return endDate.plusDays(1).atStartOfDay();
+        }
+    }
+
+    private record TrendPoint(LocalDate date, int count) {
     }
 }

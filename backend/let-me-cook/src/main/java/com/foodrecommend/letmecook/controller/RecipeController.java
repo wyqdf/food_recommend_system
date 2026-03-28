@@ -6,6 +6,7 @@ import com.foodrecommend.letmecook.common.Result;
 import com.foodrecommend.letmecook.dto.*;
 import com.foodrecommend.letmecook.service.RecipeService;
 import com.foodrecommend.letmecook.util.AuthTokenHelper;
+import com.foodrecommend.letmecook.util.SceneModeResolver;
 import lombok.RequiredArgsConstructor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
@@ -73,14 +74,8 @@ public class RecipeController {
             @RequestParam(required = false) String mode,
             @RequestParam(required = false) Integer categoryId,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
-
-        Integer userId = null;
-        try {
-            userId = authTokenHelper.optionalUserId(authorization);
-        } catch (Exception ignored) {
-            userId = null;
-        }
-        String resolvedScene = StringUtils.hasText(scene) ? scene : mapModeToScene(mode);
+        Integer userId = authTokenHelper.optionalUserId(authorization);
+        String resolvedScene = StringUtils.hasText(scene) ? scene : SceneModeResolver.resolveSceneCode(mode);
         RecommendResponse response = recipeService.getRecommendationsByType(type, limit, userId, resolvedScene,
                 categoryId);
         return Result.success(response);
@@ -100,18 +95,5 @@ public class RecipeController {
         Map<String, Object> data = new HashMap<>();
         data.put("id", recipeId);
         return Result.success(data);
-    }
-
-    private String mapModeToScene(String mode) {
-        if (!StringUtils.hasText(mode)) {
-            return null;
-        }
-        return switch (mode.trim().toLowerCase()) {
-            case "family" -> "family";
-            case "fitness" -> "diet";
-            case "quick" -> "quick";
-            case "party" -> "banquet";
-            default -> null;
-        };
     }
 }

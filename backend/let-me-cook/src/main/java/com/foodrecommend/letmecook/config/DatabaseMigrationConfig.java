@@ -75,7 +75,7 @@ public class DatabaseMigrationConfig {
             addIndexIfNotExists("idx_cook_session_recipe_time", "cooking_sessions", "recipe_id, started_at DESC");
             addIndexIfNotExists("idx_cook_session_user_start_time", "cooking_sessions", "user_id, started_at DESC");
             enforceFavoriteUniqueness();
-            syncRecipeFavoriteCounts();
+            log.info("保留 recipes.favorite_count 的现有基数；收藏增减改由业务链路实时维护");
             setIndexInvisibleIfExists("comments", "idx_comment_recipe");
             setIndexInvisibleIfExists("recipes", "idx_createtime");
             setIndexInvisibleIfExists("recipes", "idx_like_count");
@@ -118,26 +118,6 @@ public class DatabaseMigrationConfig {
             log.info("评论插入触发器刷新完成");
         } catch (Exception e) {
             log.warn("刷新评论插入触发器失败：{}", e.getMessage());
-        }
-    }
-
-    private void syncRecipeFavoriteCounts() {
-        try {
-            log.info("同步 recipes.favorite_count 与 interactions 收藏数据...");
-            int updated = jdbcTemplate.update("""
-                    UPDATE recipes r
-                    LEFT JOIN (
-                        SELECT recipe_id, COUNT(*) AS favorite_count
-                        FROM interactions
-                        WHERE interaction_type = 'favorite'
-                        GROUP BY recipe_id
-                    ) fav ON fav.recipe_id = r.id
-                    SET r.favorite_count = COALESCE(fav.favorite_count, 0)
-                    WHERE COALESCE(r.favorite_count, -1) <> COALESCE(fav.favorite_count, 0)
-                    """);
-            log.info("recipes.favorite_count 同步完成，更新 {} 条记录", updated);
-        } catch (Exception e) {
-            log.warn("同步 recipes.favorite_count 失败：{}", e.getMessage());
         }
     }
 

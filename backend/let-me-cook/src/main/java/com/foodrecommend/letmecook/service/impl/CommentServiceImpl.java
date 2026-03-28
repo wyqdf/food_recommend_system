@@ -11,6 +11,8 @@ import com.foodrecommend.letmecook.mapper.UserMapper;
 import com.foodrecommend.letmecook.service.CommentService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class CommentServiceImpl implements CommentService {
     private final CommentLikeMapper commentLikeMapper;
     private final RecipeMapper recipeMapper;
     private final UserMapper userMapper;
+    private final CacheManager cacheManager;
     
     @Override
     public PageResult<Comment> getComments(Integer recipeId, int page, int pageSize, Integer userId) {
@@ -62,6 +65,7 @@ public class CommentServiceImpl implements CommentService {
         
         commentMapper.insert(comment);
         recipeMapper.incrementReplyCount(request.getRecipeId());
+        evictRecipeDetail(request.getRecipeId());
 
         User user = userMapper.findById(userId);
         if (user != null) {
@@ -82,6 +86,16 @@ public class CommentServiceImpl implements CommentService {
             }
         } catch (DuplicateKeyException ignored) {
             // 点赞按幂等处理，重复点击不再重复加一。
+        }
+    }
+
+    private void evictRecipeDetail(Integer recipeId) {
+        if (recipeId == null) {
+            return;
+        }
+        Cache cache = cacheManager.getCache("recipe_detail");
+        if (cache != null) {
+            cache.evict(recipeId);
         }
     }
 }

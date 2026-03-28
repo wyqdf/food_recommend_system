@@ -82,4 +82,45 @@ public interface BehaviorEventMapper {
     List<Map<String, Object>> countActiveHoursInLastDays(@Param("userId") Integer userId,
                                                           @Param("days") int days,
                                                           @Param("limit") int limit);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM behavior_events
+            WHERE recipe_id = #{recipeId}
+            AND event_type = 'recipe_view'
+            """)
+    int countRecipeViewsByRecipeId(@Param("recipeId") Integer recipeId);
+
+    @Select("<script>" +
+            "SELECT recipe_id AS recipeId, COUNT(*) AS total " +
+            "FROM behavior_events " +
+            "WHERE event_type = 'recipe_view' " +
+            "AND recipe_id IN " +
+            "<foreach item='id' collection='recipeIds' open='(' separator=',' close=')'>" +
+            "#{id}" +
+            "</foreach> " +
+            "GROUP BY recipe_id" +
+            "</script>")
+    List<RecipeViewCountDTO> countRecipeViewsByRecipeIds(@Param("recipeIds") List<Integer> recipeIds);
+
+    class RecipeViewCountDTO {
+        private Integer recipeId;
+        private Integer total;
+
+        public Integer getRecipeId() {
+            return recipeId;
+        }
+
+        public void setRecipeId(Integer recipeId) {
+            this.recipeId = recipeId;
+        }
+
+        public Integer getTotal() {
+            return total;
+        }
+
+        public void setTotal(Integer total) {
+            this.total = total;
+        }
+    }
 }

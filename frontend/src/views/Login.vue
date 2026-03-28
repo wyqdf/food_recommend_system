@@ -38,7 +38,7 @@
             <h2>欢迎回来</h2>
             <p>登录您的账号</p>
           </div>
-          <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @keyup.enter="handleLogin">
+          <el-form ref="formRef" class="login-form" :model="form" :rules="rules" label-width="0" @keyup.enter="handleLogin">
             <el-form-item prop="username">
               <el-input v-model="form.username" prefix-icon="User" placeholder="请输入用户名" size="large" />
             </el-form-item>
@@ -48,7 +48,6 @@
             </el-form-item>
             <div class="form-options">
               <el-checkbox v-model="rememberMe">记住我</el-checkbox>
-              <el-checkbox v-model="autoLogin">自动登录</el-checkbox>
             </div>
             <el-form-item>
               <el-button type="primary" class="login-btn" @click="handleLogin" :loading="loading" size="large">
@@ -59,18 +58,19 @@
           <div class="demo-users">
             <div class="demo-users__header">
               <h3>展示用户</h3>
-              <p>以下 5 个账号用于演示 Top100 推荐效果，密码统一为 <strong>123456</strong></p>
+              <p>以下 5 个账号仅用于测试与演示，密码统一为 <strong>123456</strong></p>
             </div>
-            <button
-              v-for="user in demoUsers"
-              :key="user.username"
-              type="button"
-              class="demo-user"
-              @click="fillDemoUser(user.username)"
-            >
-              <span class="demo-user__name">{{ user.username }}</span>
-              <span class="demo-user__style">{{ user.style }}</span>
-            </button>
+            <div class="demo-users__grid">
+              <button
+                v-for="user in demoUsers"
+                :key="user.username"
+                type="button"
+                class="demo-user"
+                @click="fillDemoUser(user.username)"
+              >
+                <span class="demo-user__name">{{ user.username }}</span>
+              </button>
+            </div>
           </div>
           <div class="register-link">
             还没有账号？<router-link to="/register">立即注册</router-link>
@@ -94,13 +94,12 @@ const userStore = useUserStore()
 const formRef = ref()
 const loading = ref(false)
 const rememberMe = ref(false)
-const autoLogin = ref(false)
 const demoUsers = [
-  { username: '好吃好吃难做', style: '减脂一人食' },
-  { username: '梅依旧', style: '快手家常' },
-  { username: '千惠烘焙', style: '烘焙甜点' },
-  { username: '小红马', style: '儿童辅食' },
-  { username: 'littlelittle', style: '早餐面点' }
+  { username: '好吃好吃难做' },
+  { username: '梅依旧' },
+  { username: '千惠烘焙' },
+  { username: '小红马' },
+  { username: 'littlelittle' }
 ]
 
 const form = reactive({
@@ -131,13 +130,7 @@ const handleLogin = async () => {
       localStorage.removeItem('rememberedUsername')
       localStorage.removeItem('rememberMe')
     }
-    
-    if (autoLogin.value) {
-      localStorage.setItem('autoLogin', 'true')
-    } else {
-      localStorage.removeItem('autoLogin')
-    }
-    
+
     ElMessage.success('登录成功')
     const redirect = route.query.redirect || '/'
     router.push(redirect)
@@ -156,11 +149,6 @@ onMounted(() => {
     form.username = rememberedUsername
     rememberMe.value = true
   }
-  
-  const autoLoginFlag = localStorage.getItem('autoLogin')
-  if (autoLoginFlag === 'true') {
-    autoLogin.value = true
-  }
 })
 </script>
 
@@ -170,138 +158,207 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 30px 16px;
-  background: radial-gradient(circle at 10% 10%, #fff4eb 0%, #f6f8fb 45%);
+  padding: 36px 18px;
+  background:
+    radial-gradient(circle at 12% 14%, rgba(255, 214, 186, 0.72) 0%, rgba(255, 244, 235, 0.18) 28%, transparent 54%),
+    linear-gradient(180deg, #fff9f5 0%, #f7f8fb 100%);
 }
 
 .login-container {
-  display: flex;
-  max-width: 960px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.06fr) minmax(380px, 0.94fr);
+  max-width: 1080px;
   width: 100%;
+  min-height: 680px;
   background: #fff;
-  border-radius: var(--radius-lg);
+  border-radius: 32px;
   overflow: hidden;
   border: 1px solid var(--border-color);
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 28px 80px rgba(38, 34, 30, 0.12);
 }
 
 .login-left {
-  flex: 1;
-  background: linear-gradient(135deg, #e85d2a 0%, #f08b5d 70%, #ffb347 100%);
-  padding: 52px 34px;
+  position: relative;
+  background:
+    radial-gradient(circle at 82% 18%, rgba(255, 233, 205, 0.28) 0%, transparent 30%),
+    linear-gradient(145deg, #da5324 0%, #e97039 52%, #f3a85c 100%);
+  padding: 64px 52px 56px;
   display: flex;
   flex-direction: column;
   justify-content: center;
   color: #fff;
 }
 
+.login-left::before {
+  content: "";
+  position: absolute;
+  inset: 28px 34px auto auto;
+  width: 164px;
+  height: 164px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  opacity: 0.75;
+}
+
+.login-left::after {
+  content: "";
+  position: absolute;
+  left: -44px;
+  bottom: -56px;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.06) 42%, transparent 72%);
+}
+
 .login-brand {
-  text-align: center;
-  margin-bottom: 36px;
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  text-align: left;
+  margin-bottom: 42px;
 }
 
 .brand-icon {
-  width: 72px;
-  height: 72px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 78px;
+  height: 78px;
+  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.18);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin: 0 auto 18px;
+  margin: 0 0 22px;
+  backdrop-filter: blur(10px);
 }
 
 .login-brand h1 {
-  font-size: 26px;
+  font-size: 34px;
   font-weight: 700;
-  margin-bottom: 12px;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
 }
 
 .login-brand p {
-  font-size: 14px;
-  opacity: 0.9;
+  max-width: 320px;
+  font-size: 15px;
+  line-height: 1.7;
+  opacity: 0.92;
 }
 
 .login-features {
+  position: relative;
+  z-index: 1;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 12px;
+  max-width: 420px;
 }
 
 .feature-item {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 14px 18px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: var(--radius-md);
-  transition: var(--transition);
+  padding: 16px 18px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  backdrop-filter: blur(10px);
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .feature-item:hover {
-  background: rgba(255, 255, 255, 0.2);
-  transform: translateX(8px);
+  background: rgba(255, 255, 255, 0.18);
+  border-color: rgba(255, 255, 255, 0.24);
+  transform: translateX(6px);
 }
 
 .feature-item span {
   font-size: 15px;
+  font-weight: 500;
 }
 
 .login-right {
-  flex: 1;
-  padding: 46px 32px;
+  position: relative;
+  padding: 56px 44px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(255, 230, 214, 0.42) 0%, transparent 32%),
+    linear-gradient(180deg, #ffffff 0%, #fffaf6 100%);
 }
 
 .login-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 410px;
   border: none;
   box-shadow: none;
+  background: transparent;
+}
+
+.login-card :deep(.el-card__body) {
+  padding: 0;
 }
 
 .card-header {
-  text-align: center;
-  margin-bottom: 24px;
+  text-align: left;
+  margin-bottom: 28px;
 }
 
 .card-header h2 {
-  font-size: 26px;
+  font-size: 30px;
   font-weight: 700;
   color: var(--text-primary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .card-header p {
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-secondary);
+}
+
+.login-form :deep(.el-form-item) {
+  margin-bottom: 16px;
+}
+
+.login-form :deep(.el-input__wrapper) {
+  min-height: 50px;
+  padding: 0 16px;
+  border-radius: 14px;
+  box-shadow: 0 0 0 1px rgba(217, 182, 157, 0.45) inset;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.login-form :deep(.el-input__wrapper.is-focus) {
+  box-shadow: 0 0 0 1.5px rgba(232, 93, 42, 0.58) inset;
 }
 
 .login-btn {
   width: 100%;
-  height: 46px;
+  height: 50px;
   font-size: 16px;
   font-weight: 600;
-  border-radius: 12px;
+  border-radius: 14px;
+  letter-spacing: 0.5px;
 }
 
 .demo-users {
-  margin-top: 18px;
-  padding: 16px;
-  border-radius: 16px;
-  background: #fff7f1;
-  border: 1px solid #f6d8c6;
+  margin-top: 20px;
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #fff8f3 0%, #fff4ed 100%);
+  border: 1px solid #f3d7c6;
+  box-shadow: 0 14px 32px rgba(233, 126, 69, 0.08);
 }
 
 .demo-users__header {
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .demo-users__header h3 {
-  margin: 0 0 6px;
-  font-size: 15px;
+  margin: 0 0 8px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -313,56 +370,52 @@ onMounted(() => {
   color: var(--text-secondary);
 }
 
+.demo-users__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .demo-user {
   width: 100%;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px 12px;
-  margin-bottom: 8px;
-  border-radius: 12px;
+  justify-content: flex-start;
+  min-height: 54px;
+  padding: 12px 14px;
+  margin-bottom: 0;
+  border-radius: 16px;
   border: 1px solid #f0d2bf;
   background: #fff;
   cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-}
-
-.demo-user:last-child {
-  margin-bottom: 0;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease, background 0.18s ease;
 }
 
 .demo-user:hover {
   transform: translateY(-1px);
   border-color: #e85d2a;
-  box-shadow: 0 8px 20px rgba(232, 93, 42, 0.12);
+  background: #fffaf7;
+  box-shadow: 0 10px 24px rgba(232, 93, 42, 0.12);
 }
 
 .demo-user__name {
   font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-}
-
-.demo-user__style {
-  flex-shrink: 0;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #fff0e8;
-  color: #d65523;
-  font-size: 12px;
-  font-weight: 600;
+  word-break: break-all;
 }
 
 .form-options {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
 }
 
 .register-link {
   text-align: center;
-  margin-top: 24px;
+  margin-top: 22px;
   color: var(--text-secondary);
   font-size: 14px;
 }
@@ -374,59 +427,66 @@ onMounted(() => {
 
 @media (max-width: 768px) {
   .login-page {
-    padding: 16px 10px;
+    padding: 20px 12px;
   }
 
   .login-container {
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    min-height: auto;
+    border-radius: 26px;
   }
 
   .login-left {
-    padding: 24px 18px;
+    padding: 30px 24px 24px;
   }
 
   .login-right {
-    padding: 20px 18px 24px;
+    padding: 28px 22px 28px;
   }
 
   .login-brand {
-    margin-bottom: 20px;
+    margin-bottom: 24px;
   }
 
   .brand-icon {
     width: 62px;
     height: 62px;
-    margin-bottom: 14px;
+    margin-bottom: 16px;
   }
 
   .login-brand h1 {
-    font-size: 24px;
+    font-size: 28px;
   }
 
   .demo-users {
-    margin-top: 16px;
+    margin-top: 18px;
   }
 
   .login-features {
     flex-direction: row;
     flex-wrap: wrap;
-    justify-content: center;
+    justify-content: flex-start;
     gap: 12px;
   }
 
   .feature-item {
-    padding: 12px 16px;
-    min-width: 130px;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
+    padding: 14px 14px;
+  }
+
+  .demo-users__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 430px) {
   .login-left {
-    padding: 24px 14px 20px;
+    padding: 24px 16px 18px;
   }
 
   .login-right {
-    padding: 14px 12px 20px;
+    padding: 20px 16px 22px;
   }
 
   .card-header {
@@ -439,13 +499,17 @@ onMounted(() => {
 
   .form-options {
     flex-wrap: wrap;
-    gap: 8px 16px;
+    gap: 8px 14px;
     margin-bottom: 14px;
   }
 
   .demo-user {
-    align-items: flex-start;
-    flex-direction: column;
+    min-height: 50px;
+    padding: 11px 12px;
+  }
+
+  .demo-users__grid {
+    grid-template-columns: 1fr;
   }
 
   .feature-item {

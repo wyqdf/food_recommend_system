@@ -27,9 +27,14 @@ required_vars=(
   MYSQL_ROOT_PASSWORD
   MYSQL_PASSWORD
   JWT_SECRET
-  ALIYUN_OSS_ACCESS_KEY_ID
-  ALIYUN_OSS_ACCESS_KEY_SECRET
 )
+
+if [[ "${ALIYUN_OSS_ENABLED:-false}" == "true" ]]; then
+  required_vars+=(
+    ALIYUN_OSS_ACCESS_KEY_ID
+    ALIYUN_OSS_ACCESS_KEY_SECRET
+  )
+fi
 
 for var in "${required_vars[@]}"; do
   value="${!var:-}"

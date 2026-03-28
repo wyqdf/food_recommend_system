@@ -9,6 +9,8 @@ import com.foodrecommend.letmecook.service.FavoriteService;
 import com.foodrecommend.letmecook.service.RecipeListDTOAssembler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class FavoriteServiceImpl implements FavoriteService {
     private final InteractionMapper interactionMapper;
     private final RecipeMapper recipeMapper;
     private final RecipeListDTOAssembler recipeListDTOAssembler;
+    private final CacheManager cacheManager;
 
     @Override
     @Transactional
@@ -36,6 +39,7 @@ public class FavoriteServiceImpl implements FavoriteService {
             int inserted = interactionMapper.insert(interaction);
             if (inserted > 0) {
                 recipeMapper.incrementFavoriteCount(recipeId);
+                evictRecipeDetail(recipeId);
             }
         } catch (DuplicateKeyException ignored) {
             // 收藏唯一约束会拦住并发重复收藏；重复请求按幂等成功处理即可。
@@ -48,6 +52,7 @@ public class FavoriteServiceImpl implements FavoriteService {
         int deleted = interactionMapper.deleteFavorite(userId, recipeId);
         if (deleted > 0) {
             recipeMapper.decrementFavoriteCountBy(recipeId, deleted);
+            evictRecipeDetail(recipeId);
         }
     }
 
@@ -93,5 +98,15 @@ public class FavoriteServiceImpl implements FavoriteService {
         List<RecipeListDTO> list = recipeListDTOAssembler.toListDTOBatch(orderedRecipes);
 
         return new PageResult<>(list, total, safePage, safePageSize);
+    }
+
+    private void evictRecipeDetail(Integer recipeId) {
+        if (recipeId == null) {
+            return;
+        }
+        Cache cache = cacheManager.getCache("recipe_detail");
+        if (cache != null) {
+            cache.evict(recipeId);
+        }
     }
 }

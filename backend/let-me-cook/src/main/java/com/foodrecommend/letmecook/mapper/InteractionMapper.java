@@ -17,8 +17,42 @@ public interface InteractionMapper {
     @Select("SELECT EXISTS(SELECT 1 FROM interactions WHERE user_id = #{userId} AND recipe_id = #{recipeId} AND interaction_type = 'favorite')")
     boolean existsFavorite(@Param("userId") Integer userId, @Param("recipeId") Integer recipeId);
 
-    @Select("SELECT recipe_id FROM interactions WHERE user_id = #{userId} AND interaction_type = 'favorite' ORDER BY create_time DESC, id DESC")
-    List<Integer> findFavoriteRecipeIds(Integer userId);
+    @Select("""
+            SELECT i.recipe_id
+            FROM interactions i
+            INNER JOIN recipes r ON r.id = i.recipe_id
+            WHERE i.user_id = #{userId}
+            AND i.interaction_type = 'favorite'
+            AND r.status = 1
+            ORDER BY i.create_time DESC, i.id DESC
+            LIMIT #{limit}
+            """)
+    List<Integer> findRecentPublicFavoriteRecipeIds(@Param("userId") Integer userId,
+                                                    @Param("limit") int limit);
+
+    @Select("""
+            SELECT COUNT(*)
+            FROM interactions i
+            INNER JOIN recipes r ON r.id = i.recipe_id
+            WHERE i.user_id = #{userId}
+            AND i.interaction_type = 'favorite'
+            AND r.status = 1
+            """)
+    long countPublicFavoriteRecipes(Integer userId);
+
+    @Select("""
+            SELECT i.recipe_id
+            FROM interactions i
+            INNER JOIN recipes r ON r.id = i.recipe_id
+            WHERE i.user_id = #{userId}
+            AND i.interaction_type = 'favorite'
+            AND r.status = 1
+            ORDER BY i.create_time DESC, i.id DESC
+            LIMIT #{offset}, #{limit}
+            """)
+    List<Integer> findPublicFavoriteRecipeIdsPage(@Param("userId") Integer userId,
+                                                  @Param("offset") int offset,
+                                                  @Param("limit") int limit);
 
     @Select("SELECT COUNT(*) FROM interactions WHERE recipe_id = #{recipeId} AND interaction_type = 'favorite'")
     int countFavoritesByRecipeId(Integer recipeId);

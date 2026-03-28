@@ -80,12 +80,30 @@ public interface StatisticsSummaryMapper {
             "ORDER BY recipe_rank LIMIT #{limit}")
     List<TopRecipesHourly> getLatestTopRecipes(@Param("limit") int limit);
 
+    @Select("SELECT " +
+            "stat_time, recipe_id, recipe_title, like_count, view_count, comment_count, recipe_rank, last_updated " +
+            "FROM top_recipes_hourly " +
+            "WHERE stat_time = (" +
+            "  SELECT MAX(stat_time) FROM top_recipes_hourly WHERE stat_time <= #{endTime}" +
+            ") " +
+            "ORDER BY recipe_rank LIMIT #{limit}")
+    List<TopRecipesHourly> getTopRecipesBefore(@Param("endTime") LocalDateTime endTime, @Param("limit") int limit);
+
     // ==================== 热门评论食谱 ====================
     @Select("SELECT stat_time, recipe_id, recipe_title, comment_count, recipe_rank, last_updated " +
             "FROM top_commented_recipes_hourly " +
             "WHERE stat_time = (SELECT MAX(stat_time) FROM top_commented_recipes_hourly) " +
             "ORDER BY recipe_rank LIMIT #{limit}")
     List<TopCommentedRecipesHourly> getLatestTopCommentedRecipes(@Param("limit") int limit);
+
+    @Select("SELECT stat_time, recipe_id, recipe_title, comment_count, recipe_rank, last_updated " +
+            "FROM top_commented_recipes_hourly " +
+            "WHERE stat_time = (" +
+            "  SELECT MAX(stat_time) FROM top_commented_recipes_hourly WHERE stat_time <= #{endTime}" +
+            ") " +
+            "ORDER BY recipe_rank LIMIT #{limit}")
+    List<TopCommentedRecipesHourly> getTopCommentedRecipesBefore(@Param("endTime") LocalDateTime endTime,
+                                                                @Param("limit") int limit);
 
     // ==================== 插入/更新操作 ====================
 

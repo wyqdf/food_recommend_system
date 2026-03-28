@@ -16,11 +16,14 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AdvancedStatisticsService {
+
+    private final ReentrantLock refreshLock = new ReentrantLock();
 
     private final AdvancedStatisticsMapper advancedStatisticsMapper;
     private final StatisticsSummaryMapper statisticsSummaryMapper;
@@ -216,25 +219,30 @@ public class AdvancedStatisticsService {
     }
 
     public String refreshAllStatistics() {
-        log.info("开始手动刷新所有统计数据...");
-        long startTime = System.currentTimeMillis();
-
+        refreshLock.lock();
         try {
-            refreshIngredientUsage();
-            refreshTasteDistribution();
-            refreshTechniqueDistribution();
-            refreshTimeCostDistribution();
-            refreshQualityAnalysis();
-            refreshInteractionTrend();
-            refreshActiveUsers();
+            log.info("开始手动刷新所有统计数据...");
+            long startTime = System.currentTimeMillis();
 
-            long endTime = System.currentTimeMillis();
-            String result = "统计数据刷新完成，耗时 " + (endTime - startTime) + "ms";
-            log.info(result);
-            return result;
-        } catch (Exception e) {
-            log.error("手动刷新统计数据失败", e);
-            return "刷新失败: " + e.getMessage();
+            try {
+                refreshIngredientUsage();
+                refreshTasteDistribution();
+                refreshTechniqueDistribution();
+                refreshTimeCostDistribution();
+                refreshQualityAnalysis();
+                refreshInteractionTrend();
+                refreshActiveUsers();
+
+                long endTime = System.currentTimeMillis();
+                String result = "统计数据刷新完成，耗时 " + (endTime - startTime) + "ms";
+                log.info(result);
+                return result;
+            } catch (Exception e) {
+                log.error("手动刷新统计数据失败", e);
+                return "刷新失败: " + e.getMessage();
+            }
+        } finally {
+            refreshLock.unlock();
         }
     }
 
@@ -343,7 +351,7 @@ public class AdvancedStatisticsService {
                 VALUES (?,
                     (SELECT COUNT(*) FROM interactions WHERE interaction_type = 'like' AND create_time >= CURDATE()),
                     (SELECT COUNT(*) FROM interactions WHERE interaction_type = 'favorite' AND create_time >= CURDATE()),
-                    (SELECT COUNT(*) FROM interactions WHERE interaction_type = 'view' AND create_time >= CURDATE()))
+                    (SELECT COUNT(*) FROM behavior_events WHERE event_type = 'recipe_view' AND create_time >= CURDATE()))
                 """;
         jdbcTemplate.update(sql, today);
         log.info("互动趋势统计刷新完成");

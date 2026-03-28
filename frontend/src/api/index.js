@@ -10,8 +10,8 @@ export const recipeApi = {
     return request.get("/recipes", { params });
   },
 
-  getDetail(id) {
-    return request.get(`/recipes/${id}`);
+  getDetail(id, config = {}) {
+    return request.get(`/recipes/${id}`, config);
   },
 
   search(params, config = {}) {

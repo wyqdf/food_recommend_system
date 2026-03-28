@@ -37,16 +37,7 @@ BEGIN
         CREATE UNIQUE INDEX uk_interactions_user_recipe_favorite
             ON interactions(user_id, recipe_id, favorite_unique_flag);
     END IF;
-
-    UPDATE recipes r
-    LEFT JOIN (
-        SELECT recipe_id, COUNT(*) AS favorite_count
-        FROM interactions
-        WHERE interaction_type = 'favorite'
-        GROUP BY recipe_id
-    ) fav ON fav.recipe_id = r.id
-    SET r.favorite_count = COALESCE(fav.favorite_count, 0)
-    WHERE COALESCE(r.favorite_count, -1) <> COALESCE(fav.favorite_count, 0);
+    /* 保留 recipes.favorite_count 的现有导入基数；用户收藏增减由运行时业务链路维护。 */
 END$$
 DELIMITER ;
 

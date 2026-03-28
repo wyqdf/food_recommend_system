@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.dao.DuplicateKeyException;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -27,12 +29,19 @@ class FavoriteServiceImplTest {
     @Mock
     private RecipeListDTOAssembler recipeListDTOAssembler;
 
+    @Mock
+    private CacheManager cacheManager;
+
+    @Mock
+    private Cache recipeDetailCache;
+
     @InjectMocks
     private FavoriteServiceImpl favoriteService;
 
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+        when(cacheManager.getCache("recipe_detail")).thenReturn(recipeDetailCache);
     }
 
     @Test
@@ -43,6 +52,7 @@ class FavoriteServiceImplTest {
 
         verify(interactionMapper, times(1)).insert(any());
         verify(recipeMapper, times(1)).incrementFavoriteCount(100);
+        verify(recipeDetailCache, times(1)).evict(100);
     }
 
     @Test
@@ -53,6 +63,7 @@ class FavoriteServiceImplTest {
 
         verify(interactionMapper, times(1)).insert(any());
         verify(recipeMapper, never()).incrementFavoriteCount(100);
+        verify(recipeDetailCache, never()).evict(100);
     }
 
     @Test
@@ -63,5 +74,6 @@ class FavoriteServiceImplTest {
 
         verify(interactionMapper, times(1)).deleteFavorite(1, 100);
         verify(recipeMapper, times(1)).decrementFavoriteCountBy(100, 2);
+        verify(recipeDetailCache, times(1)).evict(100);
     }
 }

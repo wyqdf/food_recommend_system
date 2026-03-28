@@ -1,5 +1,7 @@
 package com.foodrecommend.letmecook.service;
 
+import com.foodrecommend.letmecook.common.exception.BadRequestException;
+import com.foodrecommend.letmecook.common.exception.NotFoundException;
 import com.foodrecommend.letmecook.dto.CookingSessionDTO;
 import com.foodrecommend.letmecook.dto.CookingSessionFinishRequest;
 import com.foodrecommend.letmecook.dto.CookingSessionProgressRequest;
@@ -23,7 +25,7 @@ public class CookingSessionService {
     @Transactional
     public CookingSessionDTO startOrResumeSession(Integer userId, Integer recipeId) {
         if (recipeId == null || recipeId <= 0) {
-            throw new RuntimeException("recipeId 无效");
+            throw new BadRequestException("recipeId 无效");
         }
 
         CookingSession latest = cookingSessionMapper.findLatestInProgressByUserAndRecipe(userId, recipeId);
@@ -33,7 +35,7 @@ public class CookingSessionService {
 
         Recipe recipe = recipeMapper.findPublicById(recipeId);
         if (recipe == null) {
-            throw new RuntimeException("菜谱不存在");
+            throw new NotFoundException("菜谱不存在");
         }
 
         int totalSteps = Math.max(cookingStepMapper.findByRecipeId(recipeId).size(), 1);
@@ -64,7 +66,7 @@ public class CookingSessionService {
 
         int updated = cookingSessionMapper.updateProgress(userId, sessionId, safeStep, durationMs);
         if (updated <= 0) {
-            throw new RuntimeException("烹饪会话不存在或已结束");
+            throw new BadRequestException("烹饪会话不存在或已结束");
         }
         return toDto(requireSession(userId, sessionId), true);
     }
@@ -75,7 +77,7 @@ public class CookingSessionService {
         Integer durationMs = request == null ? null : safeDuration(request.getDurationMs());
         int updated = cookingSessionMapper.finishSession(userId, sessionId, durationMs);
         if (updated <= 0) {
-            throw new RuntimeException("烹饪会话不存在或已结束");
+            throw new BadRequestException("烹饪会话不存在或已结束");
         }
         return toDto(requireSession(userId, sessionId), true);
     }
@@ -89,11 +91,11 @@ public class CookingSessionService {
 
     private CookingSession requireSession(Integer userId, Long sessionId) {
         if (sessionId == null || sessionId <= 0) {
-            throw new RuntimeException("sessionId 无效");
+            throw new BadRequestException("sessionId 无效");
         }
         CookingSession session = cookingSessionMapper.findByIdAndUser(sessionId, userId);
         if (session == null) {
-            throw new RuntimeException("烹饪会话不存在");
+            throw new NotFoundException("烹饪会话不存在");
         }
         return session;
     }

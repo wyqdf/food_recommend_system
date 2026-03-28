@@ -4,7 +4,7 @@
 
 - Ubuntu 24.04 server
 - Ports opened in firewall/security group:
-  - `3000` (frontend)
+  - `1234` (frontend)
   - `8081` (backend API)
   - `9200` (optional, only if you want to debug Elasticsearch from outside the server)
 - MySQL (`3306`) is bound to `127.0.0.1` by default for security
@@ -34,14 +34,21 @@ Edit `.env.server` and set real values:
 - `MYSQL_ROOT_PASSWORD`
 - `MYSQL_PASSWORD`
 - `JWT_SECRET`
-- `ALIYUN_OSS_ACCESS_KEY_ID`
-- `ALIYUN_OSS_ACCESS_KEY_SECRET`
-- keep `ALIYUN_OSS_ENABLED=true`
+- if you need upload on the server:
+  - set `ALIYUN_OSS_ENABLED=true`
+  - set `ALIYUN_OSS_ACCESS_KEY_ID`
+  - set `ALIYUN_OSS_ACCESS_KEY_SECRET`
+- if upload is not needed yet:
+  - keep `ALIYUN_OSS_ENABLED=false`
 - keep `SEARCH_ENGINE=auto`
 - verify `SPRING_ELASTICSEARCH_URIS=http://elasticsearch:9200`
 - keep `SEARCH_ES_INDEX_ALIAS=recipes_search`
 - keep `SEARCH_ES_INDEX_NAME=recipes_search_v2`
+- keep `NGINX_API_UPSTREAM=http://backend:8081`
+- keep `FRONTEND_PORT=1234`
+- keep `SERVER_DATA_ROOT=/opt/food-data`
 - note: the compose file builds a custom Elasticsearch image with the official `analysis-smartcn` plugin
+  - for weak-network servers, prefer the `prebuilt` deployment path and preload `food-elasticsearch:smartcn`
 
 ## 4. Deploy
 
@@ -68,12 +75,19 @@ Elasticsearch is built from the repo Dockerfile and includes:
 
 - official `analysis-smartcn` plugin
 - persistent data volume `elasticsearch_data`
+- host-mounted persistence root `${SERVER_DATA_ROOT}` for MySQL and Elasticsearch in prebuilt mode
+
+The current startup files also include:
+
+- frontend container now proxies `/api` to `backend:8081` inside the compose network
+- datasource URLs now include prepared-statement cache and batch-write optimizations
+- OSS credentials are only mandatory when `ALIYUN_OSS_ENABLED=true`
 
 ## 5. Verify
 
 ```bash
 docker compose --env-file .env.server -f docker-compose.server.yml ps
-curl -I http://127.0.0.1:3000
+curl -I http://127.0.0.1:1234
 curl -I http://127.0.0.1:8081/api/categories
 curl -I http://127.0.0.1:9200
 ```

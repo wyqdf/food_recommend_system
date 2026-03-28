@@ -216,7 +216,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'completed'])
+const emit = defineEmits(['update:modelValue', 'completed', 'skipped'])
 
 const submitting = ref(false)
 const sceneOptions = ref([])
@@ -376,6 +376,13 @@ const toggleMulti = (list, value) => {
 }
 
 const skipOnce = () => {
+  trackBehavior('questionnaire_skip', {
+    sourcePage: 'onboarding_dialog',
+    extra: {
+      mode: 'interest-tags'
+    }
+  })
+  emit('skipped')
   emit('update:modelValue', false)
 }
 

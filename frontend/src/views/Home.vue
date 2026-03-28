@@ -104,6 +104,7 @@ import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
 import SearchEntry from '@/components/SearchEntry.vue'
 import { trackBehavior } from '@/utils/tracker'
+import { createLatestRequestGuard } from '@/utils/latestRequest'
 import { SEARCH_HOT_KEYWORDS, addSearchHistory } from '@/utils/search'
 import { useSceneModeStore } from '@/stores/sceneMode'
 
@@ -115,6 +116,9 @@ const categories = ref([])
 const recommendList = ref([])
 const hotList = ref([])
 const loading = ref(false)
+const HOT_DISPLAY_SIZE = 8
+const HOT_POOL_PAGE_SIZE = 60
+const latestLoadGuard = createLatestRequestGuard()
 
 const hotTags = SEARCH_HOT_KEYWORDS.slice(0, 5)
 
@@ -132,6 +136,26 @@ const categoryColors = [
 
 const getCategoryIcon = (index) => categoryIcons[index % categoryIcons.length]
 const getCategoryColor = (index) => categoryColors[index % categoryColors.length]
+
+const pickRandomHotRecipes = (recipes, size = HOT_DISPLAY_SIZE) => {
+    const uniqueRecipes = []
+    const seenIds = new Set()
+
+    for (const recipe of Array.isArray(recipes) ? recipes : []) {
+        if (!recipe?.id || seenIds.has(recipe.id)) {
+            continue
+        }
+        seenIds.add(recipe.id)
+        uniqueRecipes.push(recipe)
+    }
+
+    for (let index = uniqueRecipes.length - 1; index > 0; index -= 1) {
+        const swapIndex = Math.floor(Math.random() * (index + 1))
+        ;[uniqueRecipes[index], uniqueRecipes[swapIndex]] = [uniqueRecipes[swapIndex], uniqueRecipes[index]]
+    }
+
+    return uniqueRecipes.slice(0, size)
+}
 
 const handleSearchSubmit = ({ keyword: nextKeyword }) => {
     router.push({ path: '/search', query: { keyword: nextKeyword } })
@@ -154,26 +178,35 @@ const goCategory = (cat) => {
     router.push({ path: '/recipes', query: { category: cat.id } })
 }
 
-const loadData = async () => {
+const loadData = async (mode = currentMode.value) => {
+    const requestId = latestLoadGuard.begin()
     loading.value = true
     try {
         const [catRes, recRes, hotRes] = await Promise.all([
             recipeApi.getRecommendCategories(8),
-            recipeApi.getRecommend({ type: 'personal', limit: 8, mode: currentMode.value }),
-            recipeApi.getList({ sort: 'hot', page: 1, pageSize: 8, mode: currentMode.value })
+            recipeApi.getRecommend({ type: 'personal', limit: HOT_DISPLAY_SIZE, mode }),
+            recipeApi.getList({ sort: 'hot', page: 1, pageSize: HOT_POOL_PAGE_SIZE, mode })
         ])
+        if (!latestLoadGuard.isLatest(requestId)) {
+            return
+        }
         categories.value = Array.isArray(catRes.data) ? catRes.data.slice(0, 8) : []
         recommendList.value = recRes.data.list || []
-        hotList.value = hotRes.data.list || []
+        hotList.value = pickRandomHotRecipes(hotRes.data.list, HOT_DISPLAY_SIZE)
     } catch (error) {
+        if (!latestLoadGuard.isLatest(requestId)) {
+            return
+        }
         console.error('加载失败:', error)
     } finally {
-        loading.value = false
+        if (latestLoadGuard.isLatest(requestId)) {
+            loading.value = false
+        }
     }
 }
 
 watch(currentMode, async (mode, previousMode) => {
-    await loadData()
+    await loadData(mode)
     trackBehavior('scene_mode_change', {
         sourcePage: 'home',
         extra: { mode, previousMode }
@@ -182,7 +215,7 @@ watch(currentMode, async (mode, previousMode) => {
 
 onMounted(async () => {
     trackBehavior('page_view', { sourcePage: 'home', extra: { mode: currentMode.value } })
-    await loadData()
+    await loadData(currentMode.value)
 })
 </script>
 

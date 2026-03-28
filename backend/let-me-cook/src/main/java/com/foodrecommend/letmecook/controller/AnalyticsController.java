@@ -22,13 +22,7 @@ public class AnalyticsController {
     public Result<Map<String, Object>> saveEvents(
             @RequestBody BehaviorEventBatchRequest request,
             @RequestHeader(value = "Authorization", required = false) String authorization) {
-        Integer userId = null;
-        try {
-            userId = authTokenHelper.optionalUserId(authorization);
-        } catch (Exception ignored) {
-            userId = null;
-        }
-
+        Integer userId = authTokenHelper.optionalUserId(authorization);
         int accepted = behaviorEventService.saveBatch(userId, request);
         Map<String, Object> data = new HashMap<>();
         data.put("accepted", accepted);

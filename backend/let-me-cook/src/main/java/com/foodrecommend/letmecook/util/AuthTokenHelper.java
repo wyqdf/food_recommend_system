@@ -1,5 +1,6 @@
 package com.foodrecommend.letmecook.util;
 
+import com.foodrecommend.letmecook.common.exception.UnauthorizedException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -13,7 +14,7 @@ public class AuthTokenHelper {
         String token = extractBearerToken(authorization);
         Integer userId = jwtUtil.validateUserTokenAndGetUserId(token);
         if (userId == null) {
-            throw new RuntimeException("无效的用户token");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
         return userId;
     }
@@ -28,7 +29,7 @@ public class AuthTokenHelper {
 
     private String extractBearerToken(String authorization) {
         if (authorization == null || !authorization.startsWith("Bearer ")) {
-            throw new RuntimeException("无效的token");
+            throw new UnauthorizedException("登录已过期，请重新登录");
         }
         return authorization.substring(7);
     }

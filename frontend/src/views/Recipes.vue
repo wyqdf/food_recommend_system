@@ -53,6 +53,7 @@ import { storeToRefs } from 'pinia'
 import { useRoute, useRouter } from 'vue-router'
 import { recipeApi } from '@/api'
 import RecipeGrid from '@/components/RecipeGrid.vue'
+import { createLatestRequestGuard } from '@/utils/latestRequest'
 import { useSceneModeStore } from '@/stores/sceneMode'
 
 const route = useRoute()
@@ -65,6 +66,7 @@ const loading = ref(false)
 const page = ref(1)
 const pageSize = ref(12)
 const total = ref(0)
+const latestFetchGuard = createLatestRequestGuard()
 
 const filters = ref({
   categoryId: '',
@@ -75,6 +77,7 @@ const filters = ref({
 const gridKey = computed(() => `${currentMode.value}_${filters.value.sort}_${filters.value.categoryId || 'all'}_${page.value}`)
 
 const fetchRecipes = async () => {
+  const requestId = latestFetchGuard.begin()
   loading.value = true
   try {
     const params = {
@@ -92,10 +95,15 @@ const fetchRecipes = async () => {
     }
 
     const res = await recipeApi.getList(params)
+    if (!latestFetchGuard.isLatest(requestId)) {
+      return
+    }
     recipeList.value = res.data.list
     total.value = res.data.total
   } finally {
-    loading.value = false
+    if (latestFetchGuard.isLatest(requestId)) {
+      loading.value = false
+    }
   }
 }
 
@@ -108,7 +116,6 @@ const handleCategoryChange = (value) => {
     const { category, ...query } = route.query
     router.push({ query })
   }
-  fetchRecipes()
 }
 
 watch(() => route.query.category, (newCategory, oldCategory) => {

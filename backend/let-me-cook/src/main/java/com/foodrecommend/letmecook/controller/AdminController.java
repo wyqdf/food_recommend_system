@@ -3,6 +3,7 @@ package com.foodrecommend.letmecook.controller;
 import com.foodrecommend.letmecook.common.PageResult;
 import com.foodrecommend.letmecook.common.ResponseDataBuilder;
 import com.foodrecommend.letmecook.common.Result;
+import com.foodrecommend.letmecook.common.exception.UnauthorizedException;
 import com.foodrecommend.letmecook.dto.admin.*;
 import com.foodrecommend.letmecook.service.AdminLogService;
 import com.foodrecommend.letmecook.service.AdminService;
@@ -141,6 +142,6 @@ public class AdminController {
         if (adminId instanceof Integer) {
             return (Integer) adminId;
         }
-        throw new RuntimeException("管理员身份信息缺失");
+        throw new UnauthorizedException("管理员登录已过期，请重新登录");
     }
 }

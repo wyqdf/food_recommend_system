@@ -127,6 +127,19 @@
                     <span class="time">{{ comment.publishTime }}</span>
                   </div>
                   <p>{{ comment.content }}</p>
+                  <div class="comment-actions">
+                    <el-button
+                      link
+                      type="primary"
+                      class="comment-like-btn"
+                      :disabled="isCommentLiking(comment.id) || comment.isLiked"
+                      @click="likeComment(comment)"
+                    >
+                      <el-icon><Pointer /></el-icon>
+                      <span>{{ comment.isLiked ? '已点赞' : '点赞' }}</span>
+                      <span>({{ comment.likes || 0 }})</span>
+                    </el-button>
+                  </div>
                 </div>
               </div>
               <el-empty v-if="!comments.length" description="暂无评论" />
@@ -187,7 +200,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { User, View, Star, ChatDotRound, Share, Timer, Dish, CollectionTag, Picture, VideoPlay } from '@element-plus/icons-vue'
+import { User, View, Star, ChatDotRound, Share, Timer, Dish, CollectionTag, Picture, VideoPlay, Pointer } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { recipeApi, favoriteApi, commentApi } from '@/api'
 import { useUserStore } from '@/stores/user'
@@ -211,6 +224,7 @@ const defaultImage = '/images/food-placeholder.svg'
 const commentPage = ref(1)
 const commentPageSize = ref(10)
 const commentTotal = ref(0)
+const likingCommentIds = ref([])
 const pageEnterAt = ref(Date.now())
 const loadErrorState = ref('')
 const loadErrorMessage = ref('')
@@ -434,6 +448,35 @@ const fetchComments = async (options = {}) => {
 const handleCommentPageChange = (page) => {
   commentPage.value = page
   fetchComments()
+}
+
+const isCommentLiking = (commentId) => likingCommentIds.value.includes(commentId)
+
+const likeComment = async (comment) => {
+  if (!comment?.id) {
+    return
+  }
+  if (!userStore.isLoggedIn) {
+    ElMessage.warning('请先登录')
+    router.push('/login')
+    return
+  }
+  if (comment.isLiked) {
+    ElMessage.info('你已经点过赞了')
+    return
+  }
+
+  likingCommentIds.value = [...likingCommentIds.value, comment.id]
+  try {
+    await commentApi.like(comment.id)
+    comment.isLiked = true
+    comment.likes = (comment.likes || 0) + 1
+    ElMessage.success('点赞成功')
+  } catch (error) {
+    ElMessage.error(error?.message || '点赞失败，请稍后重试')
+  } finally {
+    likingCommentIds.value = likingCommentIds.value.filter((id) => id !== comment.id)
+  }
 }
 
 const retryLoad = async () => {
@@ -745,6 +788,19 @@ const goCookMode = () => {
 .comment-header .time {
   font-size: 12px;
   color: var(--text-secondary);
+}
+
+.comment-actions {
+  margin-top: 10px;
+}
+
+.comment-like-btn {
+  padding: 0;
+  font-size: 13px;
+}
+
+.comment-like-btn .el-icon {
+  margin-right: 4px;
 }
 
 .comment-pagination {

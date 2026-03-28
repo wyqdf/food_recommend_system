@@ -27,9 +27,14 @@ required_vars=(
   MYSQL_ROOT_PASSWORD
   MYSQL_PASSWORD
   JWT_SECRET
-  ALIYUN_OSS_ACCESS_KEY_ID
-  ALIYUN_OSS_ACCESS_KEY_SECRET
 )
+
+if [[ "${ALIYUN_OSS_ENABLED:-false}" == "true" ]]; then
+  required_vars+=(
+    ALIYUN_OSS_ACCESS_KEY_ID
+    ALIYUN_OSS_ACCESS_KEY_SECRET
+  )
+fi
 
 for var in "${required_vars[@]}"; do
   value="${!var:-}"
@@ -43,7 +48,7 @@ for var in "${required_vars[@]}"; do
   fi
 done
 
-for image in mysql:8.0 food-backend:local food-frontend:local; do
+for image in mysql:8.0 food-elasticsearch:smartcn food-backend:local food-frontend:local; do
   if ! docker image inspect "${image}" >/dev/null 2>&1; then
     echo "Missing local image: ${image}"
     echo "Load it first with: docker load -i food-server-images.tar"
@@ -52,7 +57,10 @@ for image in mysql:8.0 food-backend:local food-frontend:local; do
 done
 
 backend_port="${BACKEND_PORT:-8081}"
-frontend_port="${FRONTEND_PORT:-3000}"
+frontend_port="${FRONTEND_PORT:-1234}"
+
+mkdir -p "${SERVER_DATA_ROOT:-/opt/food-data}/mysql"
+mkdir -p "${SERVER_DATA_ROOT:-/opt/food-data}/elasticsearch"
 
 echo "Starting containers from prebuilt images..."
 docker compose "${COMPOSE_ARGS[@]}" up -d

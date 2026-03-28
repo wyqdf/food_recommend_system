@@ -8,6 +8,7 @@ import com.foodrecommend.letmecook.mapper.*;
 import com.foodrecommend.letmecook.service.impl.AdminRecipeServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.context.ApplicationEventPublisher;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -41,23 +42,33 @@ class AdminRecipeServiceImplTest {
     private DifficultyMapper difficultyMapper;
     @Mock
     private IngredientMapper ingredientMapper;
+    @Mock
+    private BehaviorEventMapper behaviorEventMapper;
+    @Mock
+    private ApplicationEventPublisher applicationEventPublisher;
 
     @InjectMocks
     private AdminRecipeServiceImpl adminRecipeService;
 
     @Test
     void getRecipesShouldUseSafePagination() {
-        when(recipeMapper.findForAdmin(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
-                .thenReturn(List.of());
         when(recipeMapper.countForAdmin(any(), any(), any(), any(), any(), any(), any(), any(), any()))
-                .thenReturn(0L);
+                .thenReturn(1L);
+        when(recipeMapper.findAdminRecipeIds(any(), any(), any(), any(), any(), any(), any(), any(), any(), anyInt(), anyInt()))
+                .thenReturn(List.of(1));
+
+        Recipe recipe = new Recipe();
+        recipe.setId(1);
+        recipe.setTitle("test");
+        when(recipeMapper.findAdminByIds(List.of(1))).thenReturn(List.of(recipe));
+        when(behaviorEventMapper.countRecipeViewsByRecipeIds(List.of(1))).thenReturn(List.of());
 
         PageResult<RecipeDTO> result = adminRecipeService.getRecipes(
                 0, 999, null, null, null, null, null, null, null, null, null);
 
         assertEquals(1, result.getPage());
         assertEquals(200, result.getPageSize());
-        verify(recipeMapper).findForAdmin(
+        verify(recipeMapper).findAdminRecipeIds(
                 isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), isNull(), eq(0), eq(200));
     }
 

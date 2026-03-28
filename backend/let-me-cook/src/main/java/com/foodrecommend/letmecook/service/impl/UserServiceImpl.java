@@ -4,6 +4,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.foodrecommend.letmecook.common.ResultCode;
+import com.foodrecommend.letmecook.common.exception.BadRequestException;
+import com.foodrecommend.letmecook.common.exception.NotFoundException;
 import com.foodrecommend.letmecook.dto.*;
 import com.foodrecommend.letmecook.entity.UserPreferenceProfile;
 import com.foodrecommend.letmecook.entity.User;
@@ -31,15 +33,15 @@ public class UserServiceImpl implements UserService {
     public LoginResponse login(LoginRequest request) {
         User user = userMapper.findByUsername(request.getUsername());
         if (user == null) {
-            throw new RuntimeException(ResultCode.LOGIN_ERROR.getMessage());
+            throw new BadRequestException(ResultCode.LOGIN_ERROR.getMessage());
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException(ResultCode.LOGIN_ERROR.getMessage());
+            throw new BadRequestException(ResultCode.LOGIN_ERROR.getMessage());
         }
 
         if (user.getStatus() != null && user.getStatus() == 0) {
-            throw new RuntimeException(ResultCode.USER_DISABLED.getMessage());
+            throw new BadRequestException(ResultCode.USER_DISABLED.getMessage());
         }
 
         String token = jwtUtil.generateUserToken(user.getId());
@@ -62,7 +64,7 @@ public class UserServiceImpl implements UserService {
     public Integer register(RegisterRequest request) {
         User existingUser = userMapper.findByUsername(request.getUsername());
         if (existingUser != null) {
-            throw new RuntimeException(ResultCode.USERNAME_EXISTS.getMessage());
+            throw new BadRequestException(ResultCode.USERNAME_EXISTS.getMessage());
         }
 
         User user = new User();
@@ -78,10 +80,7 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserProfileDTO getProfile(Integer userId) {
-        User user = userMapper.findById(userId);
-        if (user == null) {
-            throw new RuntimeException("用户不存在");
-        }
+        User user = requireUser(userId);
         UserPreferenceProfile profile = userPreferenceProfileMapper.findByUserId(userId);
 
         UserProfileDTO dto = new UserProfileDTO();
@@ -97,6 +96,14 @@ public class UserServiceImpl implements UserService {
                 && profile.getOnboardingCompleted() == 1);
 
         return dto;
+    }
+
+    private User requireUser(Integer userId) {
+        User user = userMapper.findById(userId);
+        if (user == null) {
+            throw new NotFoundException("用户不存在");
+        }
+        return user;
     }
 
     @Override

@@ -57,7 +57,7 @@ services:
       - "${BACKEND_PORT:-8081}:8081"
     environment:
       TZ: Asia/Shanghai
-      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-food_recommend}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/${MYSQL_DATABASE:-food_recommend}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&cachePrepStmts=true&prepStmtCacheSize=250&prepStmtCacheSqlLimit=2048&useServerPrepStmts=true&rewriteBatchedStatements=true&cacheResultSetMetadata=true&cacheServerConfiguration=true&elideSetAutoCommits=true&maintainTimeStats=false
       SPRING_DATASOURCE_USERNAME: ${MYSQL_USER:-food_app}
       DB_PASSWORD: ${MYSQL_PASSWORD}
       JWT_SECRET: ${JWT_SECRET}
@@ -67,10 +67,10 @@ services:
       SEARCH_ES_INDEX_NAME: ${SEARCH_ES_INDEX_NAME:-recipes_search_v2}
       SEARCH_ES_BATCH_SIZE: ${SEARCH_ES_BATCH_SIZE:-500}
       SEARCH_ES_AUTO_CREATE_INDEX: ${SEARCH_ES_AUTO_CREATE_INDEX:-true}
-      ALIYUN_OSS_ENABLED: ${ALIYUN_OSS_ENABLED:-true}
+      ALIYUN_OSS_ENABLED: ${ALIYUN_OSS_ENABLED:-false}
       ALIYUN_OSS_ENDPOINT: ${ALIYUN_OSS_ENDPOINT:-oss-cn-beijing.aliyuncs.com}
-      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID}
-      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET}
+      ALIYUN_OSS_ACCESS_KEY_ID: ${ALIYUN_OSS_ACCESS_KEY_ID:-}
+      ALIYUN_OSS_ACCESS_KEY_SECRET: ${ALIYUN_OSS_ACCESS_KEY_SECRET:-}
       ALIYUN_OSS_BUCKET_NAME: ${ALIYUN_OSS_BUCKET_NAME:-recipe-images}
 
   frontend:
@@ -83,6 +83,8 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    environment:
+      NGINX_API_UPSTREAM: ${NGINX_API_UPSTREAM:-http://backend:8081}
 
 volumes:
   mysql_data:
