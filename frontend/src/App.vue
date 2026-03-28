@@ -213,7 +213,11 @@
       </div>
     </el-drawer>
 
-    <OnboardingSurveyDialog v-model="showOnboardingDialog" @completed="handleOnboardingCompleted" />
+    <OnboardingSurveyDialog
+      v-model="showOnboardingDialog"
+      @completed="handleOnboardingCompleted"
+      @skipped="handleOnboardingSkipped"
+    />
   </template>
 </template>
 
@@ -234,6 +238,7 @@ const userStore = useUserStore()
 const searchKeyword = ref('')
 const mobileMenuVisible = ref(false)
 const showOnboardingDialog = ref(false)
+const ONBOARDING_SKIP_SESSION_PREFIX = 'onboarding_skip_'
 
 let hasAppliedSceneTheme = false
 const ensureSceneTheme = () => {
@@ -282,12 +287,49 @@ const handleMobileMenuSelect = (index) => {
   goTo(index)
 }
 
+const getOnboardingDismissKey = (user = userStore.user) => {
+  const identity = user?.id ?? user?.username
+  return identity ? `${ONBOARDING_SKIP_SESSION_PREFIX}${identity}` : null
+}
+
+const isOnboardingDismissedForSession = (user = userStore.user) => {
+  if (typeof window === 'undefined') return false
+  const key = getOnboardingDismissKey(user)
+  return Boolean(key) && sessionStorage.getItem(key) === '1'
+}
+
+const setOnboardingDismissedForSession = (dismissed, user = userStore.user) => {
+  if (typeof window === 'undefined') return
+  const key = getOnboardingDismissKey(user)
+  if (!key) return
+  if (dismissed) {
+    sessionStorage.setItem(key, '1')
+  } else {
+    sessionStorage.removeItem(key)
+  }
+}
+
+const syncOnboardingDialogVisibility = (user = userStore.user) => {
+  if (!userStore.isLoggedIn || !user) {
+    showOnboardingDialog.value = false
+    return
+  }
+  showOnboardingDialog.value = user.onboardingCompleted === false && !isOnboardingDismissedForSession(user)
+}
+
 const openOnboarding = () => {
   showOnboardingDialog.value = true
 }
 
 const handleOnboardingCompleted = async () => {
-  await userStore.fetchProfile()
+  setOnboardingDismissedForSession(false)
+  await userStore.fetchProfile({ force: true })
+  syncOnboardingDialogVisibility(userStore.user)
+}
+
+const handleOnboardingSkipped = () => {
+  setOnboardingDismissedForSession(true)
+  showOnboardingDialog.value = false
 }
 
 const handleLogout = () => {
@@ -297,13 +339,18 @@ const handleLogout = () => {
   router.push('/')
 }
 
+const hydrateUserContext = async () => {
+  if (isAdminPage.value || !userStore.token) {
+    showOnboardingDialog.value = false
+    return
+  }
+  await userStore.fetchProfile()
+  syncOnboardingDialogVisibility(userStore.user)
+}
+
 onMounted(async () => {
   ensureSceneTheme()
-  if (!userStore.token) return
-  await userStore.fetchProfile()
-  if (userStore.user && userStore.user.onboardingCompleted === false) {
-    showOnboardingDialog.value = true
-  }
+  await hydrateUserContext()
 })
 
 watch(() => userStore.user, (user) => {
@@ -311,8 +358,16 @@ watch(() => userStore.user, (user) => {
     showOnboardingDialog.value = false
     return
   }
-  if (user && user.onboardingCompleted === false) {
-    showOnboardingDialog.value = true
+  syncOnboardingDialogVisibility(user)
+})
+
+watch(isAdminPage, async (adminPage, previousAdminPage) => {
+  if (adminPage) {
+    showOnboardingDialog.value = false
+    return
+  }
+  if (previousAdminPage) {
+    await hydrateUserContext()
   }
 })
 </script>
