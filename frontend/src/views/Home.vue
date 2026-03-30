@@ -117,7 +117,6 @@ const recommendList = ref([])
 const hotList = ref([])
 const loading = ref(false)
 const HOT_DISPLAY_SIZE = 8
-const HOT_POOL_PAGE_SIZE = 60
 const latestLoadGuard = createLatestRequestGuard()
 
 const hotTags = SEARCH_HOT_KEYWORDS.slice(0, 5)
@@ -136,26 +135,6 @@ const categoryColors = [
 
 const getCategoryIcon = (index) => categoryIcons[index % categoryIcons.length]
 const getCategoryColor = (index) => categoryColors[index % categoryColors.length]
-
-const pickRandomHotRecipes = (recipes, size = HOT_DISPLAY_SIZE) => {
-    const uniqueRecipes = []
-    const seenIds = new Set()
-
-    for (const recipe of Array.isArray(recipes) ? recipes : []) {
-        if (!recipe?.id || seenIds.has(recipe.id)) {
-            continue
-        }
-        seenIds.add(recipe.id)
-        uniqueRecipes.push(recipe)
-    }
-
-    for (let index = uniqueRecipes.length - 1; index > 0; index -= 1) {
-        const swapIndex = Math.floor(Math.random() * (index + 1))
-        ;[uniqueRecipes[index], uniqueRecipes[swapIndex]] = [uniqueRecipes[swapIndex], uniqueRecipes[index]]
-    }
-
-    return uniqueRecipes.slice(0, size)
-}
 
 const handleSearchSubmit = ({ keyword: nextKeyword }) => {
     router.push({ path: '/search', query: { keyword: nextKeyword } })
@@ -185,14 +164,14 @@ const loadData = async (mode = currentMode.value) => {
         const [catRes, recRes, hotRes] = await Promise.all([
             recipeApi.getRecommendCategories(8),
             recipeApi.getRecommend({ type: 'personal', limit: HOT_DISPLAY_SIZE, mode }),
-            recipeApi.getList({ sort: 'hot', page: 1, pageSize: HOT_POOL_PAGE_SIZE, mode })
+            recipeApi.getRecommend({ type: 'hot', limit: HOT_DISPLAY_SIZE, mode })
         ])
         if (!latestLoadGuard.isLatest(requestId)) {
             return
         }
         categories.value = Array.isArray(catRes.data) ? catRes.data.slice(0, 8) : []
         recommendList.value = recRes.data.list || []
-        hotList.value = pickRandomHotRecipes(hotRes.data.list, HOT_DISPLAY_SIZE)
+        hotList.value = Array.isArray(hotRes.data.list) ? hotRes.data.list : []
     } catch (error) {
         if (!latestLoadGuard.isLatest(requestId)) {
             return
